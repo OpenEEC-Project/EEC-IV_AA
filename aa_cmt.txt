@@ -1,0 +1,1891 @@
+
+
+1 |######################################################################################
+1 |# CATCH CODE    AA  (VM100 circuit board)   1985 UK Ford Granada Scorpio 2.8, 5 speed manual.
+1 |#
+1 |# 2.8 Litre V6 'Cologne' engine 1985.  UK LEADED 4 Star (~98 octane).
+1 |#
+1 |# Open loop - no EGO.  Basic 2 digit error codes.  Twin VAFS - one per bank with split inlet manifold.
+1 |# Bank Fired Injection, NOT SYNCED. Simply injects every 3 sparks, twice per cycle.
+1 |# TFI distributor - no cyl 1 narrow slot in dizzy.
+1 |# Seems to have NDS, ACC, but no coded ACC cutoff ?   Optional BAP, EGR. Fixed Octane adjustments 0, 3, 6 degree retard
+1 |# One idle speed adjust, by 75 rpm
+1 |# Static Timing in this code appears to be 10 BTDC, but UK Haynes workshop manual states 12.
+1 |# Injectors are Bosch 0 280 150 219  (-> 168cc/min, 121 gms/min, 16 lbs/hr ?)
+1 |# Calibration of sensors, tables etc. appears to be metric.
+1 |# Auto versions used 'BA'.   This code has some NDS handling in code, but workshop manual says to ground NDS for manuals.
+1 |# No switches on manual gearbox.  No KAM and small RAM.  CPU marked 'T6126' (= 8061 with no KAM ?)
+1 |#
+1 |# From inspection of board 7.5 Mhz crystal clock = 4.8uS IOTIMER in hardware.
+###1 |########################################################################################|#|#
+1 |~#
+1 |# AD Channels:
+1 |# 0 VAF1  1 VCAL  2 ACC  3 x   4 x  5 x  6 OCT  7 TP  8 ECT  9 ACT  A NDS  B x   C VAF2
+1 |#|# I/0 mappings:    0    1     2     3     4     5       6       7      8     9     10
+1 |# HSI: (bit)      PIP    x    BAP   STI    x    Idle     x       x
+1 |# HSO: (chno)     EGR    x     x     x     x    SPOUT  INJ1    INJ2    ISC   STO   S/W
+1 |# LSO: (bit)       x     x     x     x     x     x     CPUOK   Pump
+1 |# BIDI:(bit)       - - - Not used - - -
+1 |#####################################################################################################
+1 |# A/D Inputs 0-12 mapped to R7e - R96.    AD 3 4 5 11 not used, but occupy space |#
+1 |# Internal Voltages measured by DVM from actual circuit board.
+1 |# Pin Action  AD and Result       Code trigger points     Description/Notes
+1 |# 24  ground  AD6  5v => 2.536v   1.92 < V <= 3.845,      3 degrees ign delay
+1 |# 23  ground  AD6  5v => 1.245v   0    < V <= 1.92V       6 degrees ign delay
+1 |#
+1 |# 30  ground? AD10 5v => 3.453v   4.165V, 2.76V, 1.885V   P,D,N by resistor network ?
+1 |# 10  12V in? AD2      >=2.56v    EEC schematic has 3.3K/2.7K divider = 5.4V)
+1 |#                                 Raw A/D input > 5.69V ?
+1 |# 30? ground  HSI 5  High->Low    add 75rpm to Idle speed (in ISC routine)
+1 |# ?  ground  HSI 3  High->Low    STI    Self test
+1 |#####################################################################################
+1 |#    Registers -
+1 |#
+1 |# Base Regs 0-0x10
+
+1 |# 0   (Zero)    always zero 
+1 |# 2    @2
+1 |# 2  7   @2:7 Fuel Pump Drive
+1 |# 2  6   @2:6 Hardware Watchdog - keep alive signal  [4mS tick]
+1 |# 3    @3
+1 |# 4    @4
+1 |# 5    @5
+1 |# 6    @6
+1 |# 8    @8
+1 |# 9    @9
+1 |# a    @a
+1 |#    0 @a:0
+1 |#    1 @a:1
+1 |#    2 @a:2
+1 |#    3 @a:3
+1 |#    4 @a:4
+1 |# b   @b
+1 |# c   @c
+1 |# d   @d
+1 |# e   @e
+1 |# 10  @10
+
+1 |# (bit 7 (15) Most significant, bit 0 Least)
+1 |# Add Bit    Name             Description
+1 |#
+1 |#
+1 |# 12     @12 Timer Overflow counter  (~0.3 secs) not accessed anywhere
+1 |# 14     @14 general - used in error code/sensor check
+1 |# 15     @15 TEST MODE FLAGS word
+1 |#    1   @15:1 Shutdown/end of Self test ? not sure
+1 |#    2   @15:2 Engine Off Self test
+1 |#    3   @15:3 Engine On self Test
+1 |#
+1 |# 16     @16 Failure flags - Used for STI testing and output codes
+1 |#    1   @16:1 First 6 match 'master' copy (R18)
+1 |#    2   @16:2
+1 |#    3   @16:3
+1 |#    4   @16:4
+1 |#    5   @16:5
+1 |#    6   @16:6
+1 |#    7   @16:7 Vaf 1 or 2 out of range in KOEO static test ?
+1 |#    8   @16:8
+1 |#    9   @16:9
+1 |#
+1 |# 18     @18 Sensor failed flags - from std regular checks.
+1 |#    1   @18:1
+1 |#    2   @18:2
+1 |#    3   @18:3
+1 |#    4   @18:4
+1 |#    5   @18:5
+1 |#    6   @18:6 This code is masked out in code - BAP is optional.
+1 |#
+1 |# 1a     @1a Ignition status flags
+1 |#    0   @1a:0 missed 'off' event
+1 |#    1   @1a:1 missed 'on' event
+1 |#    2   @1a:2 current state
+1 |#    3   @1a:3 stops PIP being locked for 1 event (for calc or sync to take place ?)
+1 |#    4   @1a:4 Spark locked to PIP signal, below specified rpm (1000)
+1 |#    5   @1a:5 Mark transition (for spark syncing ?)
+1 |#    6   @1a:6 < 600 rpm. Use Underspeed Strategy. (rich mixture etc) Clear >650 rpm
+1 |#    7   @1a:7 < 450 rpm  Use Cranking Strategy.   Clear > 500 rpm
+1 |#
+1 |# 1b     @1b
+1 |#    7   @1b:7 New base calc required
+1 |#
+1 |# 1c     @1c Calculated Ignition advance
+1 |# 1d     @1d Last calc Ignition Advance
+1 |# 1e     @1e PIP High Time - Length of PIP 'ON' waveform (in IOTIMER ticks) 
+1 |#
+1 |# 20     @20
+1 |#    0   @20:0 Zero or negative change (delta). No Accel pump reqd (part throttle or closed ?)
+1 |#    1   @20:1 used only in STI test sequence, with VAFs? 
+1 |#    2   @20:2 Large throttle pedal change (WOT ?)
+1 |#    6   @20:6 VAF out of range flags ( > 1V with engine off ?) Used in STI test
+1 |#    7   @20:7
+1 |#
+1 |# 21     @21 Elapsed Millisecs count. Cycles 0-125 mS to drive eights of sec counter (R2a)
+1 |# 22     @22 Injection scaler. Fixed at 0x4000 here, probably fuel ratio for EGO adjustment.
+1 |# 24     @24 Set to time in secs for special 'cold start' handling.(sets B0 R2c)
+1 |# 26     @26 High byte of ACT_START value
+1 |# 27     @27 smoothed ACT value at startup. F for alternate Ignition advance for defined time (243c)
+1 |# 28     @28 Bank 1 Load value/base fuel by bank, as looked up from Load table (24b8)
+1 |# 29     @29 Bank 2 Load
+1 |# 2a     @2a Eights sec counter. Counts DOWN for some reason 8 -> 1. Set to 8 at 'New second' event 
+1 |#
+1 |# 2c     @2c
+1 |#    0   @2c:0 Set if less than 'cold secs' (R24) expired, changes ISC handling (RPM, anti stall)
+1 |#    1   @2c:1 Fuel cutoff, throttle closed ?
+1 |#    2   @2c:2 Fuel Weaken instead of cutoff below defined rpm, (anti stall/backfire ?)
+1 |#    3   @2c:3 Set if wide throttle (and rpm threshold) - sets minimum fuel, adds ign delay, etc
+1 |#
+1 |# 2d     @2d Elapsed Seconds counter. (Self Test routine checks more than 2 secs elapsed).
+1 |# 2e     @2e Last ISC (output) state change time (IOTIMER)
+1 |#
+1 |# 30-3f  @30 General purpose registers - used everywhere
+1 |#
+1 |# 40     @40 Last PIP Low->High event time (IOTIMER)
+1 |# 42     @42 Last ign delay time (120 degrees - ign advance)(from R58)
+1 |# 44     @44 Time between PIP High events (i.e Low->High transitions) in IOTIMER ticks 
+1 |# 46     @46 Last PIP High Pulsewidth time (IOTIMER ticks) 
+1 |# 48     @48 Cylinder number. Actually only counts 1-3.  For bank injection triggers.
+1 |#
+1 |# 49     @49
+1 |#    0   @49:0 Bank 2 injection 'on' was delayed/is pending
+1 |#    2   @49:2 Bank 2 injection 'off'was delayed/is pending
+1 |#
+1 |# 4a     @4a R4a and R4c are time holders used in ignition interrupt handler
+1 |# 4c     @4c
+1 |# 4e     @4e Fuel Clip Timer for fuel weaken on throttle close (600mS)
+1 |# 50     @50 Injector slope. Lookup value via function from VBATT (R52)
+1 |# 52     @52 Battery voltage lookup value - used only for injector slope calc.
+1 |# 54     @54 Last HSI state - track bit changes (= interrupt)
+1 |# 55     @55 Counts IOTIMER overflows. 3 events = ~1 sec,  for fuel pump driver
+1 |# 56     @56 Last Keep Alive time  (IOTIME for 'CPU OK' keepalive pulses)
+1 |# 58     @58 Calculated Ignition Delay time
+1 |#
+1 |# 5a     @5a
+1 |#    2   @5a:2 Markers for required functions, subroutines
+1 |#    3   @5a:3
+1 |#    4   @5a:4
+1 |#    5   @5a:5
+1 |#    6   @5a:6 Set when New ISC calc (by RPM ?)reqd
+1 |#    7   @5a:7 Set when ISC timer reset -> 2 secs ?
+1 |#
+1 |# 5b     @5b Main Task loop count (1-4)
+1 |# 5c     @5c Filtered RPM.  Used for PIP Calculation switch 
+1 |# 5e     @5e Last SPARK OUT ON and OFF times (IOTIMER) - for ign calcs
+1 |# 60     @60
+1 |# 62     @62
+1 |# 64     @64 Cyl charge by bank - grams air? (mass flow/rpm/3 effectively)
+1 |# 66     @66 used in sensor check
+1 |# 67     @67 Timer, Eights sec,  used for STO code output ?
+1 |# 68     @68 used in sensor check
+1 |#
+1 |# 69     @69
+1 |#     0  @69:0 Overflow markers - for debug only ? Not used anywhere
+1 |#     2  @69:2
+1 |#     3  @69:3
+1 |#     5  @69:5
+1 |#
+1 |# 6a     @6a General use
+1 |# 6c
+1 |# 6e     @6e temp compensation 
+1 |# 70     @70 RPM times 4, so 0.25 resolution
+1 |# 72     @72 ECT after conversion, degrees C/2
+1 |# 73     @73 ACT after conversion, Degrees C/2
+1 |# 74     @74 Only ever written - DEBUG ?
+1 |# 76     @76 Width of trip pulse => STO , always 50% duty cycle
+1 |# 78     @78 Last O/P time
+1 |# 7a     @7a used only in main loop (main task number ? 1-4)
+1 |# 7b     @7b number of sensor reads for START value (=10) 
+1 |# 7c     @7c ignition delay in degrees*4 ( 0, 3, 6 degrees)
+1 |# 7d                           not used ?
+1 |####   7e to 97 are RAW A/D inputs ####
+1 |# 7e     @7e VAF2 - Word, high byte used as coarse value (cranking and accel pump ?)
+1 |# 7f     @7f VAF2_raw high byte
+1 |# 80     @80 Vss supply - Battery level 
+1 |# 82     @82 Air Con Clutch
+1 |# 84-88  @88 not used
+1 |# 8a     @8a Octane adjust (2 wires for 3 voltage levels)
+1 |# 8c     @8c Throttle position
+1 |# 8e     @8e Engine block temp
+1 |# 90     @90 Air charge temp
+1 |# 92     @92 Neutral Drive SW
+1 |# 94     @94 not used
+1 |# 96     @96 VAF1
+1 |# 97     @97 VAF1_raw high byte
+1 |#
+1 |# 98     @98 Task number for 2nd task list lookup
+1 |# 9a     @9a Mass flow after calculations (BAP, ACT etc)
+1 |# 9c     @9c
+1 |# 9e     @9e
+1 |# 9f     @9f Initial Start value ECT - choke/enrich ?
+1 |# a0     @a0
+1 |# a2     @a2 result of ECT (= block temp) and other calcs for enrich of base fuel 16384 = 1:1
+1 |# a4     @a4 used in VAF calc
+1 |# a6     @a6 Top byte of VAF val - used for accel pump and cranking calcs
+1 |# a8     @a8
+1 |#
+1 |# a9     @a9
+1 |#    1   @a9:1 set if ign delay calc 120 degree (60 degree if clear)
+1 |#    2   @a9:2 swopping lead/trail edge ? Skip one PIP signal and clear spout_rqd
+1 |#    3   @a9:3 PIP Trigger (lead or trail edge) - set/clear hysteresis <=1000 >= 1050.
+1 |#    5   @a9:5
+1 |#
+1 |# aa     @aa TPS 'angle' (current voltage - min voltage) - for accel pump function
+1 |# ac     @ac Ignition delay delta. smoothed and limited, for ign changes
+1 |#
+1 |# ae     @ae
+1 |#    1   @ae:1 Standard 'Run Mode'.  Continue 'Engine Running' timer
+1 |#    5   @ae:5 Set at initialise clears after first PIP.  Stops the 'Cranking' timer
+1 |#    6   @ae:6 set at initialise, clears after first PIP high.
+
+1 |# af     @af used in accel calc ?
+1 |# b0     @b0 not used ?
+1 |#
+1 |# b2     @b2 Output subroutine flags
+1 |#    0   @b2:0 O/P event was missed as HSO_OVF set (event list full)
+1 |#    4   @b2:4 O/P NOW, otherwise at specified time
+1 |#    5   @b2:5 O/P on time or delayed by 200uS
+1 |#    6   @b2:6
+1 |#    7   @b2:7
+1 |#
+1 |# b3     @b3
+1 |#    0   @b3:0 Marker to sync two subroutine calcs
+1 |#    2   @b3:2
+1 |#    3   @b3:3
+1 |#    4   @b3:4
+1 |#    5   @b3:5 Status telltales for various outputs
+1 |#    6   @b3:6
+1 |#
+1 |# b4     @b4 Output services required
+1 |#    0   @b4:0
+1 |#    1   @b4:1
+1 |#    2   @b4:2
+1 |#    6   @b4:6
+1 |#    7   @b4:7
+1 |#
+1 |# b5     @b5
+1 |#    0   @b5:0 Timer overflow (every 0.3 secs)
+1 |#    1   @b5:1 'Drive' selected ?     Affects ISC.
+1 |#    2   @b5:2 'Neutral' selected ?
+1 |#    3   @b5:3 ACC switched on ?
+1 |#    4   @b5:4 NDS slection change ?
+1 |#    5   @b5:5 set base 10 BTDC if set, 12 degrees if unset (from ISC calc)
+1 |#    6   @b5:6 new PIP (ign calc required)
+1 |#    7   @b5:7 new RPM (rpm calc required)
+1 |#
+1 |# b6     @b6 Missed/pending events
+1 |#    2   @b6:2
+1 |#    4   @b6:4
+1 |#    6   @b6:6
+1 |#
+1 |# b7     @b7
+1 |#    5   @b7:5 change idle RPM by 75 rpm (in ISC calc)
+1 |#
+1 |# b8
+1 |# ba     @ba gen registers
+1 |# bc     @bc
+1 |# be     @be Filtered RPM used for ISC calc
+1 |# c0     @c0 Cranking Timer - secs - for preset Pulswidth injection calcs
+1 |# c2     @c2 Actual Inject event start time Bank 1 (IOTIMER)
+1 |# c4     @c4 Actual Inject event stop time Bank 1
+1 |# c6     @c6 Actual Inject time Bank 1
+1 |# c8     @c8 TPS Minimum Raw value - for TPS flags
+1 |# ca     @ca Enrich Factor value from accel pump calc - per bank
+1 |# cc     @cc
+1 |# ce     @ce Base injection charge (fuel) calc results (flow/14.64)
+1 |# d0     @d0
+1 |# d2     @d2 not used ?
+1 |# d4     @d4 Actual on and off, and length inject times Bank 2 (IOTIMER)
+1 |# d6     @d6
+1 |# d8     @d8
+1 |# da     @da Bank Injection Scalers for ?  Fixed at 16
+1 |# db     @db
+1 |# dc     @dc Accel pump enrich Scalers used in main injection calc. Base 1:1 = 64
+1 |# dd     @dd
+1 |# de     @de Accel pump timers in millisecs - run for ~1 second whilst Accel Pump active
+1 |# e0     @e0 
+1 |# e2     @e2 Track TPS position for Accel pump recalc
+1 |# e4     @e4
+1 |# e6     @e6 ISC - 20 mSecs ?
+1 |# e8     @e8 copied from cyl flow calc
+1 |# ea     @ea ENGINE RUNNING Timer, seconds - Elapsed time since first PIP ?
+1 |# ec     @ec Filtered, Smoothed TPS value/angle
+1 |# ee     @ee Last PIP high_low transition time (IOTIMER)
+1 |#
+1 |# f0     @f0 Ignition change (after calc) - limited to 10%
+1 |# f2     @f2 temp result holder, for DEBUG ?
+1 |# f4     @f4 ISC timer 2 secs ?
+1 |#
+1 |# f6     @f6
+1 |#    0   @f6:0 Bits for signed and unsigned lookup functions
+1 |#    1   @f6:1
+1 |#
+1 |# f7     @f7 Dummy timer entries, f7->fc also used in sensor check subroutines
+1 |# f8
+1 |# f9
+1 |# fa
+1 |# fb
+1 |# fc
+1 |# fd
+1 |# fe     @fe    NDS timer - 1 second ?
+1 |#
+1 |############## DATA and other RAM locations
+1 |#
+1 |# 100-11a    Stack
+1 |#    NB> some DEBUG items seem to be written but not read - assumed to be for cal console.
+1 |#
+1 |# 128 @128 Last PIP pulsewidth, used for ignition delay delta & smoothing
+1 |# 12a @12a DEBUG? Base airflow value, VAF2
+1 |# 130 @130 final calculated value for ISC pulsewidth, after slope compensation
+1 |# 132 @132 Calculated idle speed (RPM) after corrections etc.
+1 |# 134 @134 DEBUG ? calculated Idle speed delta.
+1 |# 136 @136 used in ISC calc - multiplier from 29fc table ?
+1 |# 138 @138 DEBUG? Value from ECTXRPM lookup table in ISC calc
+1 |# 13a @13a Double length result of calc for ISC - something pulswidth or time ?
+1 |# 13c @13c  "
+1 |# 140 @140 EGR calculated pulswidth
+1 |# 142 @142 EGR last output time
+1 |# 144 @144 IOTimer value when timer list last run - for accurate time delta
+1 |# 146 @146 TPS Last time read (IOtimer)
+1 |# 148 @148 TPS interval between reads (for delta calc)
+1 |# 14a @14a DEBUG ? result of main injection time calc for bank 1 (Timer ticks)
+1 |# 14c @14c DEBUG ?  " for bank 2
+1 |# 152 @152 BAP Last read time (for delta calc)
+1 |# 154 @154 BAP Interval between state changes (1/2 of frequency) 
+1 |# 156 @156 BAP input frequency * 2 
+1 |# 158 @158 BAP value from lookup = inches Hg*8 (atmospheric pressure*8)
+1 |# 159 @159 Fuel clip ratio (both Injection banks)
+1 |# 15a @15a DEBUG ?  FLAG BITS. RPM,Ign, Fail flags (R1a, R2c, R18) pump rqd etc
+1 |# 15c @15c Injection time (double word) without VBATT compensation, not yet output to trip.
+1 |# 15e @15e "
+1 |# 160 @160 Inject time for Cranking 
+1 |# 162 @162 (double word) Counter for trip. (1 sec trip update ? not sure)
+1 |# 164 @164
+1 |# 166 @166 AD7 smoothed voltage - for OCTANE ADJUST 0,3,6 degrees)
+1 ||################################# Data,Cal,Params ############
+1 |#
+1 |# 2400 @2400 Scaler = VAF raw/2
+1 |# 2402 @2402 VAF Post processing adjustments - not used
+1 |# 2404 @2404 
+1 |# 2406 @2406 Same for 2nd VAF.
+1 |# 2408 @2408 
+1 |# 240a @240a 
+1 |# 240c @240c (239)     Default BAP value = 29.875*8    1 atmosphere = 29.92
+1 |# 2410 @2410 (450rpm)  Cranking set below this speed. Cleared at this + hysteresis (24ae below)
+1 |# 2412 @2412 (600rpm)  Underspeed cleared above this
+1 |# 2414 @2414 (505rpm)  Underspeed set below this
+1 |# 2416 @2416 (1500rpm) Fuel Weakened instead of full cutoff below this RPM (stall risk ?)
+1 |# 2418 @2418 (1800rpm) Knock risk (if WOT) above here. Used for fuel and ignition
+1 |# 241a @241a (250C)    Max ECT start value (deg C) This and timer used for ignition
+1 |# 241b @241b (-40C)    Min ECT start value and fuel weaken/cutoff - for cold starts, but would never be used !
+1 |# 241c @241c (0 secs)  Timer Limit for cold start conditions (not used)
+1 |# 241e @241e Injector size, possibly to scale for 0.25 grams fuel per 125mS (=32768 in calcs) ?
+1 |# 2420 @2420 (7.97mS)  Max cyl charge BEFORE Corrections. (12:1, or 3380cc max at 14.64:1).
+1 |# 2422 @2422 (0.19g)   Min charge applied if knock risk flag set => 0.19g air => 35% Cyl fill
+1 |# 2424 @2424 (0.1v)    Stops accel pump recalc if TPS delta/change below this value (0.025v*4)
+1 |# 2426 @2426 (130%)    Underspeed emergency fuel enrich => 83/64 => 130 %
+1 |# 2427 @2427 (0%)      Knock risk fuel enrich, base 128
+1 |# 2428 @2428 (80c)     'Cold Start' condition below here, with timer defined by lookup table (2818)
+1 |# 2429 @2429 RPM flags preset for RPM_flags (R2c)
+1 |# 242a @242a Used in sensor check - not sure what this does
+1 |# 242b @242b Used in sensor check
+1 |# 242c @242c Multiplier for density table scaler for injection/air flow calcs
+1 |# 242e @242e
+1 |# 2430 @2430 above this and if knock risk, ignition knock increment (2468) added (big throttle change)
+1 |# 2432 @2432
+1 |# 2433 @2433 50 degrees max advance => rotor register
+1 |# 2434 @2434
+1 |# 2435 @2435 ACT and ECT Limits for alternate Ignition Advance with ECT/ACT_START Values upon initial startup
+1 |# 2436 @2436
+1 |# 2437 @2437 Default value if ECT fail => 100 deg C
+1 |# 2438 @2438 Default value if ACT fail => 20 Deg C
+1 |# 243a @243a Default value if VAF fail => 400 L/min ?
+1 |# 243b @243b Default value top byte of VAF default, for accel pump and cranking calcs
+1 |# 243c @243c Used with ign table choice (safety limits ?)
+1 |# 243e @243e Accel pump time, 1 second (16*63 = 1008 mS) If no TPS changes/recalc
+1 |# 243f @243f Minimum time expired before recalc of accel pump allowed (30mS)
+1 |# 2440 @2440 divider for Trip frequency = 1 o/p tick per 0.01 grams ?
+1 |# 2442 @2442
+1 |# 2444 @2444 Ign calc swops here from 'locked to PIP' to 'calced advance'
+1 |# 2446 @2446 Hysteresis - 'dead band' for swop
+1 |# 2448 @2448 TPS trigger points (0.065v) - No delta set if smaller than this
+1 |# 244a @244a TPS 'Big Delta' set if change bigger than this (0.25v) ('goosed' or WOT ?)
+1 |# 244c @244c Controls injection calcs 
+1 |# 244e @244e
+1 |# 2450 @2450 Underspeed ISC setting - 80% - goes in top byte
+1 |# 2451 @2451 Cranking ISC setting - 100% goes in top byte
+1 |# 2452 @2452 Set fixed ISC if not zero
+1 |# 2453 @2453 Fixed PW if ISC_Lock set. (50% open)
+1 |# 2454 @2454 Used with ISC
+1 |# 2456 @2456 Used with 'cold start' affects ISC
+1 |# 2458 @2458 0 - No EGR, 1 - Fixed pulse width PW1 (245a)
+1 |# 245a @245a
+1 |# 245c @245c
+1 |# 245e @245e
+1 |# 2460 @2460
+1 |# 2462 @2462
+1 |# 2464 @2464 Max RPM - ignition cutoff
+1 |# 2466 @2466 Base ISC frequency. 160Hz (1302 * 4.8uS = 6.25 mS)
+1 |# 2468 @2468 Ign delay to prevent Knocking - wide throttle and 2500 RPM (see 2430)
+1 |# 246a @246a
+1 |# 246c @246c if failed start or stall, begin crank PW calc from here (12 secs)
+1 |# 2470 @2470
+1 |# 2472 @2472
+1 |# 2474 @2474 Preset ignition delay, as selected via AD7 (OCTANE)
+1 |# 2475 @2475
+1 |# 2476 @2476
+1 |# 2477 @2477 Default - also 6 degrees.
+1 |# 2478 @2478 EGR is Output channel 1 if set, 0 otherwise
+1 |# 247a @247a
+1 |# 247c @247c Min ISC pulswidth = 10%
+1 |# 247e @247e ACC additional ISC pulswidth - if ACC_on set (0%)
+1 |# 2480 @2480 NDS additional ISC pulswidth - if NDS_drive set (6.5%)
+1 |# 2482 @2482
+1 |# 2484 @2484 Min and max raw sensor voltages
+1 |# 2486 @2486
+1 |# 2488 @2488
+1 |# 248a @248a
+1 |# 248c @248c
+1 |# 248e @248e
+1 |# 2490 @2490
+1 |# 2492 @2492 
+1 |# 2494 @2494 12 degrees ign advance (set in ISC calc, when ?)
+1 |# 2496 @2496
+1 |# 2498 @2498
+1 |# 249a @249a EGR behaviour against run time
+1 |# 249b @249b secs
+1 |# 249c @249c
+1 |# 249e @249e
+1 |# 24a0 @24a0
+1 |# 24a2 @24a2
+1 |# 24a4 @24a4 Max Injection (cyl charge) allowed
+1 |# 24a6 @24a6 Idle speed adjust - 75 rpm
+1 |# 24a8 @24a8 calculated Trip ?
+1 |# 24aa @24aa NDS scaler if flag set - for ISC base 128 so this is 1.
+1 |# 24ac @24ac NDS additional ignition delay
+1 |# 24ae @24ae Cranking set/clear hysteresis, 50 rpm
+1 |# 24b0 @24b0 Ignition Preset Delay select voltage points
+1 |# 24b2 @24b2
+1 |# 24b4 @24b4
+1 |# 24b6 @24b6 ISC...something to do with calc
+1 |#
+1 |######################## Tables and function data
+1 |#
+1 |# 24b8 @24b8 LOAD - Adjust fueling [RPM x Flow]
+1 |# 2531 @2531 Enrich if cold [RPM and ECT]
+1 |# 2579 @2579 Ignition advance cold, used after startup conditions
+1 |# 25f2 @25f2 Ign Advance Hot (interpolated with either 2579 or 25f2)
+1 |# 266b @266b Extra ign advance if cold, by flow and temp
+1 |# 269b @269b Ign Advance for cold startup.
+1 |#
+1 |# 2714 @2714
+1 |# 2754 @2754 Cranking_Fuel -> crank time X temp
+1 |# 279c @279c Raw volts to TFR factor -> linear
+1 |# 27b4 @27b4
+1 |# 27cc @27cc
+1 |# 27d8 @27d8 Accel pump by temp ?
+1 |# 27e4 @27e4 VAF Transfer for Cranking ?
+1 |# 2802 @2802 Multiplier for accel pump
+1 |# 2818 @2818 Coldstart strategy time reqd - indexed by ECT startup value
+1 |# 2838 @2838 ECT Scale for lookups ans 0-11
+1 |# 2858 @2858 RPM scale for loopkups ans 0-10 (not linear)
+1 |# 2874 @2874 (Mass) Flow Scale 0-10
+1 |# 2884 @2884 ECT scale 0-7
+1 |# 28a0 @28a0 (Mass) Flow scale 0-5
+1 |# 28b0 @28b0 Interpolate factors by temp, for ign hot and cold tables
+1 |# 28c0 @28c0 Vss raw to factor (for slope)
+1 |# 28cc @28cc VAF raw to volume flow (scaled Litres/min ?)
+1 |# 2918 @2918 ECT raw to degrees C
+1 |# 296c @296c ACT raw to degrees C
+1 |# 29c0 @29c0 Air density from pressure and temp -> mass flow calc
+1 |# 29e8 @29e8 Reqd idle speed by block temp ?
+1 |# 29fc @29fc
+1 |# 2a24 @2a24
+1 |# 2a3c @2a3c Slope for ISC, a large solenoid ? looks suitably geometric
+1 |# 2a64 @2a64
+1 |# 2a7c @2a7c
+1 |# 2a94 @2a94
+1 |# 2a9e @2a9e
+1 |# 2aa8 @2aa8
+1 |# 2abc @2abc
+1 |# 2ad0 @2ad0 Timer scale 0-15 secs for cranking
+1 |# 2adc @2adc BAP frequency to pressure (inches Hg * 8)
+1 |# 2af0 @2af0 Crank inject multiplier by RPM ?
+1 |# 2b04 @2b04
+1 |# 30e5 @3e05 Definition of timers and their registers
+1 |#|# NB. first entry point does not conform to 'standard' ff,fa,21 of later binaries|#
+1 |####################################################################|
+
+
+200a # checksum adjust ?
+200c # end of Hardware ROM ?
+200e ||# interrupt vectors (service routines)
+2010 # HSO Port Output 2 = cal console (external)
+2012 # I/O Timer Overflow
+2014 # A/D End of Conversion
+2016 # HSI Port Input Data Available
+2018 # External Interrupt Vector
+201a # HSO Port Output  1
+201c # HSI 1 Interrupt Vector
+201e # HSI 0 Interrupt Vector
+
+
+
+
+201e ||##########################
+201e |# INITIALISE AND START UP
+201e |##########################
+2020 # "ff,fa" standard start is here !
+2024 # Initialise low speed Out
+202b # ROM checksum loop start and stop (2000-3fff)
+2032 # Flip $2:6 and back 
+2037 # Watchdog Timer reset
+203c # add each word
+2048 # if result not zero, then
+204a # ROM Checksum fail
+2050 # Checksum segments
+2052 # but only [2050] and [205e] used
+2068 # RAM Test loop  20-17f
+206c # two passes (55 and aa patterns)
+206f # this for 2nd pass
+207b # Watchdog Timer reset
+207d # Flip CPU OK 
+208a # RAM test fail
+2092 # reset for 2nd pass
+2094 || # RAM and ROM tests done, now do the true startup.
+2098 # Clear all regs & RAM (except failflags)
+20b1 ||# Now do presets
+
+20b3 # Intrs 1,3 5 only allowed
+20b6 # Set HSO interrupt #2  (cal console)
+20b9 # in 4.8 * 178 = 0.854 mSecs
+20bd # stack has 28 entries
+20c5 # set B2?, $ae:5, $ae:6
+20c8 # set max
+20d0 # Max TPS vals
+20d4 # Set $b4:6
+20da # New second for timer (at next 1/8 sec)
+20dd # Set $1a:6, $1a:7
+20e0 # last keep_alive was NOW
+20e5 # watchdog reset
+20ea # Clear HSI store, do 12 reads regardless
+20f3 |||#########################
+20f3 |## MAIN (BASE) CODE STARTS HERE
+20f3 |#########################
+20f4 # ALL tasks return here
+20fc # Do subtask list
+2116 # $5b out of range, Restart
+2118 # Keep Alive reqd every 4 mS
+2132 # Here when Task = 0, set next task
+2135 # Read A/D Inputs 0-12
+2137 # Store in R7e - R96
+213b # command = read A/D channel
+2147 # clear channel etc, 10 bits A/D (5mV resolution)
+214b # A/D value stored
+2155 ||######### Keep Alive ##########
+2155 |# Entered every 4 mS
+2155 |# flip bit 6 of LS_PORT (CPU_OK) twice for a short pulse
+2155 |# Reset watchdog
+2155 |###############################
+2156 # reset watchdog
+215f # reset watchdog (again)
+2161 # flip CPU_OK (= LOS logic reset)
+2168 ||########### Do next task in (secondary) tasklist
+2170 ||########### Do PUMP, STO, etc ########
+2196 |||#########################
+2196 |#    END of MAIN TASK LOOP
+2196 |########################||
+2196 ||########### Do outputs #########
+21b4 ||########### Spark Out Routine ##########
+21b4 |# Rev limit at 6600 rpm
+21b4 |# Spark cutoff at max RPM (so will not be smooth...)
+21b4 |# Ign_delta is +/- 5% max (elsewhere) to soothe change rate
+21b4 |# 120 degrees appears scaled to 32768
+21b4 |###############################
+21c9 # Both bits clear - ign advance in play
+21ce # Advance Event(s) outstanding - ignore this PIP
+21ce ||######## Spark locked to PIP (immediate O/P) ###############
+21d1 # set immediate 0/P
+21d3 # On or Off Reqd
+21d9 # SPARK on - Now
+21eb # SPARK off - Now
+21f0 # Debug Flag? - used only here
+2208 |||######## (Calced) Timing Advance in use #############
+220a # Flag = advance in use
+2218 # do any pending (missed) events
+221d # Set 'calc required'
+221d ||###############################################
+1 |# Delay calc - scaled at 32768 = 120 degrees, and then +/- adjust
+1 |# flag indicates leading or trailing PIP edge (60 or 120 deg).
+1 |# Calc is -
+1 |# from PIP LOW - delta(delay+120 deg) * 60 degrees (in timer ticks)
+1 |# from PIP HIGH - delay * 120 degrees (in timer ticks). For < 1000 rpm
+1 |# Spark is ALWAYS calculated for NEXT spark
+1 |###############################################|
+2220 ||##### PIP Low (trailing edge) processing #####|
+2226 # recalc for 60 degree multiplier(delay*2)
+2230 # R32 = delay*delta/32768, = delta(delay)
+2238 # R30 = -32768-delta (sign preserved ?)
+223a # R34 = delta(delay)+delta(120)
+2241 # times 60 degrees in ticks ?
+2244 # = delta(delay+120)* $1e; (scaled)
+2247 # SPOUT On at LAST_PIP_Low + delta(delay+120)*PIP_Hi_PW
+224b ||##### PIP High (leading edge) processing #####
+2250 # recalc for 120 degree multiplier
+2256 # delay * 120 degrees in ticks ?
+225d # R34 = delay*pip_Hi_intvl (scaled)
+2260 # SPOUT On at LAST_PIP_HIGH + delay*PIP_Hi_Intvl
+2260 || ### Resume Main Flow ###|
+2264 # SPOUT ON
+2267 # single event at R34+[R3c]
+226a # do output as set above
+228b # Fit 1.4mS <= PIP_High_PW <= 50mS
+228d # or 14K rpm <= PIP_PW <= 400 rpm
+2291 # -> $5e
+2298 # SPOUT Off at $1e + $5e
+229b # with checked pulsewidth.
+22ae ||##################
+22ae |# Injection Bank 1 Output.
+22ae |# schedules on and off events for Injectors
+22ae |####################
+22af # delayed On - do now
+22b2 # delayed Off - retry
+22b8 # Nothing to do
+22cd # Inj On - Now
+22da # Save actual start time
+22e6 # -> $c2
+22ed # Inj Bank 1 Off at $c2 + $c6
+2306 ||##################
+2306 |# Injection Bank 2 Output.
+2306 |# schedules on and off events for Injectors
+2306 |####################
+2307 # delayed On - do now
+230a # delayed Off - retry
+2310 # Nothing to do
+2328 # Inj On - Now
+2332 # Save actual start time
+233e # -> $d4
+2345 # Inj Bank 2 Off at $d4 + $d8
+235e |||##########################################################
+235e |# DOL - Output for trip computer - STO has separate routine (below)
+235e |# 50% duty cycle at variable freq as ON and OFF are the same value
+235e |# for slow frequencies use version with single event (to save O/P slots ?)
+235e |# otherwise use this func for double event. Swops over at approx. half scale (0x4000)
+235e |##########################################################
+2370 # >= 12.7 Hz - use single event routine
+2373 # 50% duty cycle at variable Freq
+2379 # -> $78 (2nd event)
+2386 # 2 events.On, Off with interrupt
+2391 # Off event start time/On event end
+2394 ||####################################################
+2394 |# main output routine - 1 or 2 events supported.
+2394 |# calls low level output routine for each event reqd.
+2394 |# Rb2 = flags (in and out)
+2394 |# Rba = event 1 definition (channel + state)
+2394 |# Rbb = event 2 definition
+2394 |# R34 = event 1 start time  (+[R3c] if B7 set)
+2394 |# R36 = event 2 start time  (as increment from actual event 1 time)
+2394 |# R3c = pointer to additional delay (word) 
+2394 |# Rb2 flags IN
+2394 |#  B7 SET    Event 1 time = R34 + [R3c],  Event 2 time = R34 + [R3c] + R36
+2394 |#  B6 SET    No event 2 if B7 set (=> extra delay R3c)
+2394 |#  B7 CLEAR  Event 1 NOW (immediate output)
+2394 |#  B4 SET    Event 1 time = NOW, Event 2 time = NOW+R36
+2394 |# ANSWERS
+2394 |#  R30    = actual start time of event 1
+2394 |#  R32    = actual start time of event 2
+2394 |#  Rb2 B5   output delayed if clear (but not used elsewhere)
+2394 |#  Rb2 B0   output busy = event(s) missed
+2394 |####################################################
+23ac # Event 1 state + chl
+23af # Event 1 time reqd
+23b2 # Event interval from now (negated)
+23be # output delayed, save true event time
+23d3 # Event 2 state + chl
+23d6 # Event 2 time reqd
+23d9 # Event interval from now (negated)
+23e2 # Save actual event time
+23ff |||###########################################
+23ff |#    DATA Parameters and Tables main block
+23ff |###########################################
+2400 # Flow scaler for VAF    (= 1/2)
+2402 # trim scale 1
+2404 # trim scale 2
+2406 # and same for second VAF
+240c # 239 = 29.875 inches Hg (1 std atmo)
+2410 # 450 rpm, cranking set (& underspeed)
+2412 # 600 rpm, underspeed cleared
+2414 # 505 rpm, underspeed set
+2416 # 1500 rpm, Min RPM for fuel cutoff, weaken fuel instead on TPS close
+2418 # 1800 rpm, Min RPM for fuel cutoff when cold start, AND knock risk above this.
+241a # ECT Start max
+241b # ECT start min
+241c # mSecs - Timer from engine start to force snip instead of cutoff ?
+241e # 167cc/min    25166 ticks = 0.25 gram fuel ?.
+2420 # Max (base) injection charge. (563 cc at 1.2058 g/L)
+2422 # Min (base) injection charge whilst knock risk flag set
+2424 # TPS delta to force accel pump recalc
+2426 # Enrich 30% if underspeed (and cranking). Scale 64, 83/64 = 1.297.^# Crank scale 32 => 2.594
+2427 # Enrich if Knock Risk. scale 128 so this is 1:1 (no additional)
+2428 # max temp to inhibit fuel cut off
+242a # used in sensor check...
+242c # Density scaler for Air Density table. = 1.206 at default values (1g air at STP)
+2430 # 2500 rpm - add knock spark delay if above here
+2433 # Ignition register, max and min.
+2434 # Ignition Scaler (128 is x1)
+2438 # various temp triggers for cold start etc.
+243a # 1.75v = 2800 L/min => 1000rpm ?
+243c # Secs - (~ 11 mins) IGN table swopover from cold start conditions
+2446 # Hysteresis for flag at value above (1k rpm)
+244C # Flags (when set)^# B0 (set)   but not used anywhere ?
+244c ^# B2 (clear) Force bank 2 = Bank 1 calculated injection time
+244a ^# B3 (Set)   Average the cyl mass calcs unless cranking ^#(otherwise done separately per bank - for filtering ?)
+244a ^# B4 (Clear) Allow Tmr9 flag [from NDS, affects idle/ISC]^#    (3 NDS flags total)
+244e # Digital Filter for ISC rpm (100%, reverse delta ?)
+2450 # Underspeed ISC - Top Byte = 26112 = 4.98mS (79.7%)
+2451 # Cranking ISC Pulswidth - Top Byte = 32768 = 6.25mS (100%)
+2452 # b0 - set fixed ISC pulsewidth of [2453]^# b1 - allow 200rpm increase (STI ? COld ?)
+2453 # Fixed ISC pulsewidth 50% , top byte = 16384 => 3.125mS (50%)
+2454 # mSecs ISC
+2456 # 1430 rpm, ISC something
+2460 # mSecs. Timer for Fuel clip.
+2464 # 6600 rpm = rev limit (spark cutoff)
+2466 # ISC Base multiplier/freq (=> 6.25mS =>160Hz)
+2468 # additional spark delay if knock risk
+246a # Always force averaged cyl mass if set to zero
+246c # Restart cranking lookup here (12 secs) => stall or fail to start
+2470 # => 240- 350 ticks/sec => 120-175 Hz
+2474 # 0 degree retard
+2475 # 3 deg retard
+2476 # 6 deg retard
+2477 # safety default retard, but not used
+2478 # set if EGR connected to chan 1 instead of chan 0
+247a # = Secs
+247c # 10% Minimum opening for ISC
+247e # added to ISC if ACC flag
+2480 # added to ISC if NDS 1 Flag (DRIVE - 6.5% extra ?)
+2482 # = mSecs
+2484 # = 5.0 Volts
+2486 # = 0.125 Volts
+2488 # = 4.6 Volts
+248a # = 0.15 Volts
+248c # = 4.6 Volts
+248e # = 0.26 Volts
+2490 # = 5.0 Volts
+2492 # = 0.2 Volts
+2494 # Base IGN 12 degrees (via ISC)
+249a # = Secs
+249c # = Secs
+249e # = Secs
+24a0 # Injection scaler for calc - is x1
+24a2 # Added Only to bank1 time. For Crankcase breather ?
+24a4 # Max inject value (32768 = 125mS = 0.25 gms fuel)
+24a6 # Idle Adject = 75 rpm
+24a8 # Trip computer. Update period 1/8 sec in ticks (x8 in code = 1 sec)
+24aa # Scale ISC if NDS (128 is x1)
+24ac # Add ign if NDS
+24ae # = 50 rpm hysteresis (cranking)
+24b0 # below 3.845v for 3 degree retard [2475] (0 [2474] if above)
+24b2 # below 1.92v    for 6 degree retard [2476]
+24b4 # below 0v for DEFAULT [2477]
+24b6 # = 1200 rpm
+24b7 ||##########################################################
+24b7 |# Load - Base Fuel Adjustment - Flow(down+) x RPM(across+) 11 x 11 (shown scaled, base = 0x80 = 1:1)
+24b7 |##########################################################
+2526 ||##########################################################
+1 |# Flow & Temp enrichment [i.e. choke] Cyl Flow (down+) x ECT (across+) 12 X 6
+1 |# used as multiplier factor => 32 is base (default 10th col (=hot))
+1 |##########################################################
+
+256d ||##########################################################
+256d |# Ignition Timing COLD - Flow (down+) x RPM (across+) 11 X 11
+256d |# Used with HOT table and interpolated via ACT
+256d |# RPM Cols    700 1000 1300 1600 2000 2500 3000 3500 4000 5000 6000
+1 |##########################################################
+25e7 ||##########################################################
+25e7 |# Ignition Timing HOT - Flow (down+) x RPM (across+) 11 X 11
+25e7 |# Used with COLD table and interpolated via ACT lookup table
+1 |##########################################################
+2660 ||##########################################################
+2660 |# Additional Ign advance if engine block cold - Flow (down+) x ECT (across+)
+1 |##########################################################
+2693 ||##########################################################
+2693 |# Alternate (Safety ?) Cold Ign Timing    Flow (down+) x RPM (across+) 11 X 11
+2693 |# used for cold start conditions (ECT ACT) and with time limit.
+2693 |# Still interpolated with HOT table, not quite same as std COLD table, but close.....
+1 |##########################################################
+2709 ||## EGR Dummy (referenced at 3f80 )
+274c ||##########################################################
+274c |# Cranking Fuel -> Crank Time (down+) ECT (across+)    used as multiplier ##
+274c |# Crank/Timer0 is a 15 sec timer    then multiplied by RPM lookup...
+1 |##########################################################
+2754 # 0 secs
+2760 # 3 secs
+276c # 6 secs
+2778 # 9 secs
+2784 #12 secs
+2790 #15 secs or more
+2790 ||##########################################################
+2790 |# Injector Slope lookup. lookup via battery Voltage). O/P Value is added to inject time calc
+2790 |# scaled 0-32768 = 0-125ms.
+1 |##########################################################
+27a0 # 0.3   mS
+27a4 # 0.858 mS
+27a8 # 1.65  mS
+27b0 # 3.7   mS
+27b0 ||##########################################################
+27b0 |##  next two tables used with Timer2 - Accel Pump ? ########
+27b0 |# used if Timer2 < LU8 lookup
+27b0 |# LU7 as multiplier LU8 as divider/time frame (secs) - code ~ 3605
+27b0 |# could be fading enrich for 'n' secs ....
+27b0 |# 'Base' scale appears to be 16384 ... (128 x 128 ...)
+1 |##########################################################
+
+27b6 # 60C Hot
+27bc # 0C
+27c0 # -20C Cold
+27ca ||######### ECT to timer ########
+27ca |# Output Value is SECONDS used against Timer 2
+27ca |# some kind of enrichment applied if less than time below in secs (3605)
+27ca |#################
+27ce # 48C Hot
+27d2 # -20C Cold
+27d6 ||####################################
+1 |# Accel pump lookup, ECT modifier
+1 |# IN ECT Value
+1 |# OUT multiplier factor
+1 |# Linked to Accel pump multiplier (2802, below) for Accel Pump Calc
+1 |###################################################
+27da # 76C Hot
+27e0 # 26C Cold
+27e2 ||###################################
+1 |# Coarse VAF Transfer
+1 |# IN - Top byte of VAF Raw (VAF/256).
+1 |# OUT - multiplier ? used with accel lookup below
+1 |###################################
+2800 ||###############################
+1 |# Accel pump multiplier [Fixed value ?]
+1 |# IN - VAF coarse (Reversed though = 256 - R3c (code at 3850) 
+1 |# OUT - FIXED at 131 ?
+1 |# then mulitplied by ECT (block temp) lookup (at 3867)
+1 |###################################
+
+280c # Separate Table ? Not used anywhere
+2816 ||###############################
+2816 |# Coldstart Strategy time ? Used with ECT_Start value
+2816 |# output is secs. Affects ISC (1200/1430 rpm) and EGR (to fixed PW)
+1 |##########################################################
+281c # Hot, 0 mins >= 80C
+2824 # 16C, 4 mins
+2828 # <=10C, 8.3 mins
+2834 # Cold. 8.6 mins
+2834 ||#### ECT (block temp) Scaler #####
+2838 # Hot - scaled in with byte in TOP
+2840 # default return is 10 (70 - 150C)
+2854 # Cold
+2854 |##### RPM scaler ##############
+285c # 8=4000, 9=5000, 10=6000 & up
+2860 # 5=2500, 6=3000, 7=3500
+2864 # 2=1300, 3=1600, 4=2000
+2868 # 0=0-700, 1=1000,
+2870 ||##### Flow scaler (cylinder) ######
+2870 |# Linear scale over small number range.  Is this full range of flow ?.
+2880 ||###########
+2884 # Hot
+2888 # default return is 7 (in 50)
+289c # Cold
+289c ||#### Flow Scaler 2 ###########
+289c |# Enrichment FLOW scaler used with 2531 when ECT cold => choke
+289c |# This is identical calibration to 2874 to half of scale then cuts off
+28ac ||## ACT temp interpolate - for IGN HOT and COLD tables. in = ACT , OUT 0(hot) - 128 (cold)
+28b0 # Hot
+28b8 # full swopover between 26C and 46C
+28bc # Cold
+28c0 # Linear transfer as proportion of Battery voltage
+28c8 ||#####################################################
+1 |# VAF Transfer.  Input scaled to Volts.
+1 |# Output may be scaled at 32768 = 2800L/min ?
+# from simulator and guesswork. So output is  val/11.7. 
+# 1 |# which makes a kind of sense. 
+# 1 |# output scaled at x/12 for now.
+1 |#####################################################
+2914 ||#############################################################
+1 |# ECT Transfer - Upper byte used for scale funcs and table lookup
+1 |# input scaled to volts, output to degrees C
+1 |##########################################################
+2954 # ECT default value (std normal hot)
+2968 ||#####################################################
+2968 |# ACT (VAT) Transfer - Upper byte used for later scale and table lookup
+2968 |# Input scaled to volts, output to degrees C
+1 |##########################################################
+2988 # ACT default value (std temp 20C)
+29b8 # very HOT !!
+
+29bc ||##################################################################
+1 |# Air Density compensation - applied after raw air density calculation
+1 |# of Pressure/Temp.  Reduces high pressure multipliers and increases
+1 |# low pressure from mid point (1.2).
+1 |# This is probably a version of the flow/drag equation, i.e.
+1 |# force on flap proportional to velocity squared (=volume)*density
+1 |# May also include other VE scavenging aspects against density
+1 |#####################################################################
+29c0 # high density, reduce sensor reading
+29cc # default = 1.2
+29dc # low density, increase sensor reading
+29e4 ||#################################################
+29e4 |# idle speed versus ECT - added into calculation 
+1 |#################################################
+29e8 # 850  rpm - Hot, > 76 C
+29f0 # 1100 rpm
+29f8 # 1300 rpm - Cold -40C
+29f8 ||#####################################################
+29f8 |### Pulsewidth adjustment for ISC Valve - used as multiplier in code
+29f8 |# appears to be +/- 25rpm resolution , 50 rpm deadband
+29f8 |# Scaled /65536 (2621 = 0.04, 1835 = 0.028, 52 = 0.008 )
+1 |##########################################################
+2a20 ||######################################################
+2a20 |# with above ISC table - ECT in , multiplied with ISC table ...result scaled in 32 bits and then div 65536
+2a20 |# for 0-65536 and rescaled via ISC_PW_TFR below. (after some adjustments)
+2a20 |# effectively governs rate of change by RPMxECT, max 0.25%, min 0.1%
+2a20 |# at 1638 multiply gives 52 => 1.3 (0.002%),    1835 => 45.86,    2621 => 65.5 (1%)
+2a20 |# at 4096 multiply gives 52 => 3.25 (0.005%), 1835 => 114.6875, 2621 => 163.8125 (2.5%)
+2a20 |######################################################
+2a24 # Hot and default (100C)
+2a2c # Swops between 64 and 76 C
+2a38 # Cold
+2a38 ||######################################################
+2a38 |# ISC Pulsewidth Transfer
+2a38 |# may be solenoid lag/slope adjustment ? looks like quadratic curve.
+2a38 |# OUTPUT scaled as 0-32768 = 0 - 6.25mS. Input 0-32767 ? 3277 min...
+2a38 |######################################################
+2a40 # 100% 6.25 mS  90% and up
+2a44 # 83%  5.1875   80%
+2a48 # 68%  4.25     70%
+2a4c # 60%  3.875    60%
+2a50 # 55%  3.4375   50%
+2a54 # 49%  3.0625   40%
+2a58 # 42%  2.625    30%
+2a5c # 38%  2.375    20% (19% for 10% ?)
+2a60 ||######################################################
+2a60 |# ISC Pulsewidth lookup against Filtered RPM scaled 0-32768 = 6.25mS
+2a60 |######################################################
+2a64 # 40% = 2.5mS
+2a6c # 33% = 2.0625mS
+2a78 ||# ISC Pulsewidth lookup against ECT - used directly if TPS fail
+2a7c # Hot (22% = 1.375mS)
+2a84 # 25% (1.5625mS)
+2a88 # 60% (3.75mS)
+2a90 # Cold (90% 5.625mS)
+2a90 ||# Lookups for EGR (not used here) against ECT and ACT (as multipliers to PW table)
+2a90 |# and scalers below them (flow and RPM, both 0-7)
+2acc ||## Cranking Scaler (Timer 0).    Linear. mSecs IN. Cranking Time    Linear 0-15 secs for 0-5 scale
+2acc |## against Crank Fuel table (2754)
+2ad8 ||# BAP convertor to air pressure. Input range is 44800 - 30720 (175Hz - 120Hz)
+2ad8 |# Book indicates range 80-160 Hz for 0-1 atmo. 159 Hz => default = 239 (1 atmo)
+2ad8 |# looks like this is inches Hg * 8 (240 = 30 in Hg => 29.92, 239 = 29.875)
+2ae0 # 162.7 Hz [1.033] (1.037 atmo 31 in Hg)
+2ae4 # 138.3 Hz [0.766] (0.7 atmo = 23 in Hg)
+2ae8 # 116.8 Hz [0.5]   (0.5 atmo = 15 in Hg)
+2aec ||## RPM lookup for Cranking.    Used as multiplier of Crank fuel table ###
+2b00 ||# lookup against ECT if timer below threshold  RPM value subtracted from ISC calculation
+2b00 |# effective change range -40 through 20C.
+2b04 # Hot
+2b18 # Cold
+2b18 |||#############################################
+2b18 |# Physical output routine - called only from HS_OUT routine
+2b18 |# Rb8  - time reqd
+2b18 |# R3e  - Event state and channel
+2b18 |# R3a  - Event time reqd from now, NEGATED if time is left
+2b18 |# Auto delay to 200uS from now if less than 200uS left.
+2b18 |# set carry if delayed Output, cleared otherwise
+2b18 |# Rb8 as return par, TRUE start time of event.
+2b18 |#############################################
+2b1c # is really    if (R3a < 0)
+2b26 # make positive value
+2b28 # check at least 200uS to go
+2b2c # OK - use orig time
+2b39 # add 200 uS to event time
+2b46 ||#######################
+2b46 |# Increment total Injection time for trip computer (shares STO output)
+2b46 |# input - R32 = ACTUAL Inject time - in 'ticks' (of 4.8 uS)
+2b46 |# Called separately for each bank,
+2b46 |# 15c (as double word) = Cumulative inject time in ticks for both banks since last trip Output.
+2b46 |# This is recalculated in Trip_calc (3947). 
+2b46 |######################
+2b4c # remove Inject Slope compensation
+2b59 # is a 32 bit addition
+2b61 # save new inject time
+2b66 ||##########################################################
+2b66 |# TRIP Output - for trip computer - single event.
+2b66 |# 50% duty cycle as ON and OFF are the same value
+2b66 |# for fast frequencies uses double event version at 235f
+2b66 |# swops over at approx. half scale (0x4000)
+2b66 |##########################################################|
+2b6a # -> = $78
+2b6e # O/P time = $76+$78 - single event
+2b77 # set reqd TRIP state + interrupt
+2b86 # flip (save) TRIP state
+2b89 ||##########################################################
+2b89 |# STO Output
+2b89 |# A straight follow of STO_REQD bit to output line.
+2b89 |# stops output if STI not active/dropped.
+2b89 |##########################################################
+2b9b # STO off - immediate
+2ba3 # flip (keep) STO state
+2bb7 ||##############################
+1 |# Common return point for many subroutines (2170 = 'ret')
+1 |# probably for cal con monitoring ?
+1 |############################### 
+2bb8 ||#################################################
+2bb8 |# Do_ISC    Idle control valve driver
+2bb8 |# R30 (PulseWidth length) calibrated as 328-32768 = ~0 - 6.25mS
+2bb8 |# which is then subtracted from 6.25mS
+2bb8 |# to get 1-100% duty cycle at 160hz|#
+2bb8 |# 'off' = last event time + scaled R34 (Idle_PW)
+2bb8 |# 'on'  = 6.25ms - scaled R34.
+2bb8 |####################################################
+2bbb # NEVER set ?, always jumps
+2bc3 # IDL off - immediate
+2be9 # force 328 <= R30 <= 32768
+2bed # 1302*4.8uS = 6.25ms
+2bf8 # R34 = ISC_PW*6.25/32768
+2c00 # this is remainder, 6.25mS - R34
+2c0b # -> $2e
+2c15 # 2 events: off, then on with interrupt
+2c27 ||################################################
+2c27 |# Do_EGR    EGR control is not fitted in this vehicle.
+2c27 |# EGR_Present [2458] is zero.
+2c27 |# Calc below R32 is time in ticks, so R32 = R36*208c/65536
+2c27 |# seems EGR_PW is scaled as 0-32768 = 0-20mS
+2c27 |# limited in calc (3f93) to 16384 max (10 mS) ON,
+2c27 |# which defines 30ms OFF, or 25% open ?
+2c27 |################################################
+2c41 # 40 mSec 'ticks'
+2c57 # Rounding ?
+2c5b # negate to get 65536-x 'inverse'
+2c5d # Ch0 (or 1) ON
+2c7a # ch0 (or 1) OFF
+2c84 ||# do event, on or off at time R34|
+2c8e # Single event EGR_last + R34
+2c9c # flip (save) EGR_state
+2c9f ||################################################
+2c9f |# Timer overflow interrupt handler
+1 |# Occurs every 0.31 secs (4.8 uS * 65536)
+2c9f |################################################
+2ca1 # R12 not used anywhere else
+2ca5 # set after 5 hrs 43 mins elapsed, not used
+2ca8 # Fuel pump timeout (3 ticks = 1 sec, (refer 39c2)
+2cb1 ||####### Dummy Interrupt Handler ###########
+2cb2 ||####### High Speed Data IN Handler ###########
+2cc0 # only interested in state changes
+2cc3 # PREV_HSI = THIS HSI before compare ...
+2cc6 # Not Spark, check others
+2cc9 # BAP - handler is here, optional fitment.
+2ccc # Ignore (see main loop)
+2ccf # Ignore
+2cd2 # Ignore (see main loop)
+2ce5 # no high/low tracked, interval = 1/2 cycle of freq
+2d02 ||## SPARK handling from here ## 
+2d06 # Subtract propogation delay
+2d08 # is PIP HIGH or LOW ?
+2d08 ||##### LOW event processing from here #####
+2d16 # <= less than 768uS - ignore low event
+2d18 # set PIP high, wait for true Low event
+2d23 # Not if first startup (no events yet)
+2d29 # start Crank Timer from first PIP rec'd
+2d2c ||##### HIGH processing from here #####
+2d32 # <= 1.536mS (>12K rpm)- Ignore event, reset to Low state
+2d54 # inc cyl no, spark and RPM calcs reqd.
+2d5b # BOTH Inject BANKS SYNCed for injection
+2d61 # Trigger every 3 sparks = Inject EVERY revolution, TWICE per cycle
+2d63 |||############## Resume main flow ####
+2d65 # Keep fuel pump running
+2d73 # just escaped an 'underspeed' state - no advance
+2d7b # entered or in an 'underspeed' state - no advance
+2d83 ||#########PIP STATE LOW #########
+2d94 ||#########PIP STATE HIGH #########
+2dae ||##############################################
+2dae | High Speed OUT interrupt handler
+2dae | for ISC and TRIP outputs...
+2dae |##############################################|
+2dd9 ||##############################################
+2de8 ||##############################################
+2df3 |||##############################################
+2df3 |# Base Ignition Calc (RPM, Flow, ACT)
+2df3 |#
+2df3 |# Stage 1. Looks up timing via Scaled RPM and Flow and then
+2df3 |# interpolates between HOT and COLD Ignition tables
+2df3 |# via ACT lookup table to give 3D mapping.|#
+2df3 |# Uses alternate Cold table if Cold Start conditions detected|#
+2df3 |# Interpolate calculation is
+2df3 |# ((ADV_COLD*ACT) + ADV_HOT*(127-ACT))/128;
+2df3 |# where ACT lookup maps 0 to 128
+2df3 |#
+2df3 |# If underspeed, fix Advance at 10 degrees and inhibit next
+2df3 |# subroutine (no point if fixed timing...)
+2df3 |# (0x28 = 40) base 10 BTDC physical assumed
+2df3 |###############################################|
+2e26 # ACT dft = 10
+2e34 # ECT dft = 50
+2e5b # interpolate answer in R38 (0 to 128)
+2e61 # Rb8 = 127 - R38; ('reverse' of R38 for interpolate)
+2e66 # Rba = ADV_COLD * Ans/128;
+2e69 # = scaled RPM
+2e6c # = scaled (mass) Flow
+2e80 # R3c = ADV_HOT *(127 - Ans)/128;
+2e82 # = cold fraction + hot fraction 
+2e85 # Result passed to next subroutine
+2e88 # OK for next subroutine
+2e8b |||##########################################################
+2e8b |# Stage 2 ignition Calc
+2e8b |# Skip if underspeed (base ignition set)
+2e8b |# add additional ignition advance from ECT (block temp) and flow,
+2e8b |# NDS, Knock Delay and selected delay (via outside pins)
+2e8b |# Can also swop to alternate calc if demanded by Flag from ISC.
+2e8b |# (throttle closed or anti-stall below defined RPM ?)
+2e8b |# then apply limit check and smoothing.
+2e8b |##################################################
+2e8c # Need OK from previous subroutine
+2e94 # from previous subroutine, first calc of ign
+2ea3 # scaled ECT (block temp)
+2eb0 # scaled (mass) Flow
+2ec7 # Alternate (fixed base) from ISC subroutine
+2eca # fixed advance + ECT advance
+2ed3 # NDS additional advance?
+2ed8 # skip knock check
+2eda # std (base calc + ECT advance)
+2ee4 # scale and trim (redundant)
+2ef4 # add knock delay (-ve advance)
+2efc # add Octane Adjust (-ve)||### limit and delta (smoothing) from here ###|
+2eff # clip to min (zero) if -ve
+2f05 # clip to max (50) if overflow
+2f1f # 6 degrees ?
+2f22 # Delta of this and last advance ?
+2f2b # => abs(R30), abs(R38)
+2f32 # limit to 6 deg max change +/-
+2f39 # call delay calc (angular delay for spark out)
+2f3c ||##########################
+2f3c |# Scale R3c
+2f3c |# R38 defines 128ths fraction of R3c (signed)
+2f3c |# ANS  R3c = R3c * (R38/128)
+2f3c |##########################
+2f44 ||##########################
+1 |# Returns with Ignition angular DELAY.
+1 |# Scaled 0-32768 as 0-120 degrees. Sets timing for NEXT CYL.
+1 |# Degrees actually scaled *4 (0.25 degree).
+1 |# This value is then multiplied by ticks to get trigger time value - elsewhere (2200 ish).
+1 |# IGN_DELAY = (120 + 10 - Ign_Advance)*32768/120; [works as PIP_Interval = 120 degrees]
+1 |# and 10 BTDC (base) = 32768, => 120 degrees 'delay' for next cyl|#
+1 |# Ignition advance can legally be less than 10, and so calc checks 32768 boundary to do + or - calc.
+1 |# Multipled by PIP_interval [120 degrees] and triggered from PIP leading edge (Lo_Hi transition).|#
+1 |# If flag set, Calc doubles value so that delay works correctly when multiplied by PIP_HIGH_PW
+1 |# [60 degrees] and triggered from PIP trailing edge (Hi-Lo transition)
+2f44 |##########################
+2f45 # # 3 sparks per revolution
+2f4b # R34L = 1440 = 360 degrees *4
+2f4f # R34 = 120 deg *4, spark gap in degrees
+2f52 # R36 = 130 deg (static timing ?)
+2f5a # R32 = 130 - Ign_Adv
+2f5e # R30 = (130 - Ign_Adv)*65536
+2f63 # IGN_delay = R30 = (130 - IGN_ADV)*32768/120;
+2f78 # IGN_ADV < 10 [>32768], so Delay > 120 deg.
+2f7a # R32 = IGN_delay - 120 Degrees (in -ve)
+2f7f # R32 = (IGN_delay - 120 deg) * 2
+2f82 # = 120 deg + (Ign_delay - 120 deg)*2
+2f89 # IGN_ADV >=10....
+2f8d # R34 = 120 deg - ign_delay
+2f94 # = 120 deg - (120 deg - Ign_delay)*2
+2f9b ||#############################
+2f9b |# BYTE function lookup with linear interpolate
+2f9b |# Signed and Unsigned Byte
+2f9b |# R32 = lookup table
+2f9b |# R34 = value in
+2f9b |# R38 = value out (Byte)
+2f9b |#############################
+2fe0 ||###########################
+2fe0 |# Digital Filter (for rolling averages) - Signed or Unsigned WORD
+2fe0 |# (NB Unsigned Filter not used in this code)
+2fe0 |# Val_out = orig_val + (val_delta) * Filter_Constant
+2fe0 |# R32 = Original Value
+2fe0 |# R34 = New value
+2fe0 |# R36 = Filter Constant (fraction of 65536)
+2fe0 |# ANSWER
+2fe0 |# R3e = R32 + (( R34 - R32) * R36)/65536
+2fe0 |###############################
+2fe8 # R3c = difference in values
+2ff5 # +ve or -ve marker
+3000 # No change - return orig value
+3005 # R3c = (( R34 - R32) * R36)
+300c # if top of Dword zero, make -1
+3013 # R3e is R3c/65536 ....
+3016 |||############################################
+3016 |# Process other sensors, ACT,ECT,Oct Adjust,ACC,NDS
+3016 |# If startup, average first 10 readings of ACT and ECT
+3016 |# and assign to 'start' values, assign initial ISC PW, Octane, etc.
+3016 |#############################################
+301e # 10mV resolution
+3024 # rounding
+3032 # R3a = ACT_val/10
+3036 # ACT_start = ACT_start + ACT_OrigLU/10;
+3040 # 10mV resolution
+3046 # rounding
+304e # loop 10 times for ECT and ACT start values
+3054 # R3a = ECT_start/10 
+3058 # ECT_start = ECT_start + ECT_OrigLU/10;
+306a # ISC pulswidth & 1600 rpm Idle if startup
+3082 # Fail - set defaults
+308d # Fail - set defaults
+3098 # => 2% of change for octane select
+30aa # no Octane Adjust
+30b8 # 3 degrees retard (ground pin 24)
+30c6 # 6 degrees retard (ground pin 23)
+30cd # 6 degrees retard (safety default)|
+30d9 # 2.56V
+30e2 # 4.165v
+30ed # 2.76v
+30f3 # 1.885v
+3105 # b4=0, Always cleared
+3122 |||########## VAF flow calc ###################
+1 |# VAF, BAP, ACT to calculate true MASS air flow
+1 |# Sets VAF1_flow & VAF2_Flow as MASS value.
+1 |#|# Mass = Volume * Pressure/temp;  (Effectively)
+1 |# Answer scaled as 8192 = density 1.0
+1 |#|# Gas law (approx) Density =  (Pressure * 11.796)/Temp K
+1 |# looks like R3e (density multiplier) is scaled as
+1 |# 65536 = 3 atmospheres (3*8192)
+1 |# Default BAP and ACT_val = 0 (Std atmo at 0c) this subr sets
+1 |# multipler (density)= 1.2469, but 1.2929 expected, 3.5% low.
+1 |# default BAP and default ACT (20 C) gives 1.206
+1 |# Density correction table probably carries out a version of the
+1 |# 'drag equation' = force on flap proportional to Volume*density 
+1 |# Answer is scaled by final scaler (94%) and divided by 4 
+1 |#############################################
+3125 # each state change
+312e # = 26,666,666 = 128 secs in IO ticks 
+3135 # = 2* BAP frequency (Hz)
+314c # = inches Hg*8
+3156 # R36 = InHg*256
+3159 # R34L = Pressure (scaled)
+3161 # add absolute zero (272) 
+3164 # R30 = degrees Kelvin (scaled) 
+3166 # R34 = Pressure/temp (scaled)
+3169 # Correction table
+3170 # Scale by 94% and divide by 4
+3175 # R3e is 'Vol->Mass' converter
+#317e # 22400 = 1.75 Volts => 280 L/min ?
+31ac ||###################################
+1 |# VAF MASS Flow calc - used within above subroutine -
+1 |# IN  R34 = raw VAF (volume flow),
+1 |# IN  R3e = density factor
+1 |# Returns    R3a = MASS FLOW = volume * density
+1 |# assumes R32 set to VAF TFR table
+1 |# Converts volume to MASS
+1 |# final multiply makes this a straight vol*density conversion
+1 |# Limit check at 8192*65536, VAF lookup is unsigned word
+#31ac |# where Ans (R3a) equates as 8000 = 1500L/min or 750 l/min ?|# 
+#31ac |# 6636 IN gives 8000 out at std pressure
+1 |###################################
+31b6 # Volume*density/8
+31bc # max = 8192*65536
+31c5 # R3a = Volume * density
+31c8 ||##################################################
+31c8 |# TPS, do filter and set TPS flags.
+31c8 |# Calcs TPS_Difference, flags and TPS_read Interval
+31c8 |##################################################
+31db # => 4.76 % of change
+31e2 # New smoothed value
+31f3 # Throttle must be closed if equal/lower||### Throttle closed ###
+31fc # $20:1 used in test (STI) sequence
+3202 ||### Part throttle, small difference  (< 3.25v) ###
+320e ||### Wide throttle, large difference  (> 3.25V ) ###
+3213 ||### resume main code ####
+322b ||#############################
+322b |# Main RPM Calculation
+1 |# do filter and set which PIP calculation to use
+322b |#############################
+3235 # 16666666 / elapsed time is RPM/4 on 6 cyl
+3245 # 1.2% of change, heavy filter
+325b ## Flip PIP calc at 1050 and greater (50 rpm hysteresis)
+326a ## Flip PIP calc at 1000 and below
+3274 |||########################################################################
+3274 |# Table lookup subroutine with 2Dimension interpolate - byte
+3274 |# Pars In -
+3274 |# R38 = Table Address
+3274 |# R30 = X value. (column)   'whole' in top byte (R31), fraction in lower (R30)
+3274 |# R32 = Y value  (row       'whole' in top byte (R33), fraction in lower (R32)
+3274 |# R34 = table size  (columns + 1)
+3274 |# Pars out -
+3274 |# R3b = returned value (R3a =80 for rounding )
+3274 |#|# R30-R33 trashed in this function
+3274 |# Neatly interpolates by interpolating this and next columns at row X
+1 |# to make a 'slope', and then interpolating that slope in Y. (uses 4 values in table)
+3274 |###########################################################################
+3277 # Y*cols. Get into correct row.
+327b # (Y*cols)+X. = Correct (lower) cell offset.
+3280 # Add carry if byte o/flow.
+3282 # Real cell address, table+offset
+3285 # R31 = [0,0] BASE cell, below input value.
+3288 # R33 = [1,0] cell, [ next X value]
+328b # R3b = Interpolated X,0 (R31, R33) by fract X
+3290 # R33 = [1,1] cell (next x, next y)
+3295 # R31 = [0,1] cell (this x, next y)
+3298 # save interpolated X
+329b # Interpolated (X,1) value by fract X.
+329d # intpolated (X,1)
+32a0 # intpolated (X,0)
+32a3 # set interpolate fraction to Y value
+32a6 # Interpolate intpld(x,0), intpld(x,1) in fraction Y
+32a8 ||#############################
+32a8 |# UNSIGNED one dimension byte interpolate for tablookup - answer in R3b
+32a8 |# R30 = fraction 0-255
+32a8 |# R31 = lower cell value
+32a8 |# R33 = upper cell value
+32a8 |# R3b = (upper-lower)*fraction/256 + lower
+32a8 |# R3b = interpolated answer between R31 and R33 by R30
+32a8 |# Answer in R3b.
+32a8 |#############################
+32a9 # R3a = fraction * high val
+32ad # R36 = fraction * low val
+32b1 # R3a = (fract*high)-(fract*low) [= increment*fract]
+32b4 # R3b = increment*fract/256 + low
+32b7 # round up for answer in R3b
+32bb ||#############################
+32bb | WORD function lookup with linear interpolate
+32bb | Signed and Unsigned Word
+32bb | R32 = lookup table
+32bb | R34 = value in    (Vin)
+32bb | R38 = value out (Vout) (Word)
+32bb | (LU = lookup)
+32bb |#############################
+32bc # set unsigned compare
+32bf # compare IN to next table row
+32c3 # jump if signed compare
+32c6 # do unsigned compare
+32ca # do signed compare
+32cc # skip to next table row
+32d2 # R36 = high VOUT value
+32d5 # R38 = low  (next)LU value (R34>Vin>R38)
+32d8 # R36 = LU gap (between rows)
+32db # R34 = Vin_Delta (VIN - low LU)
+32de # R38 = Vout gap (between rows)
+32e1 # Is this Signed lookup
+32e4 # VOUT increment is Y +ve or unsigned lookup
+32ea # remember negative LU for later ...
+32f2 # R38 = (Vout_gap*VIN_delta)/LU_gap = Vout_Delta
+32fa # R38 = Vout_delta+lower_LU;
+3300 |||####################################
+3300 |# This calculates rate of change & averages (?)
+3300 |# for PIP intervals (last and this) to give improved
+3300 |# and smoothed response for next SPOUT.
+3300 |#
+3300 |# SPOUT = (120 + fixed - Advance)/120 - (ThisPIP + lastPIP)/lastPIP
+3300 |# and limited within an envelope - delta set at 10% increments and
+3300 |# 'nibbled' off at 1% for smoothed ignition response (?)
+3300 |# Called only from task list
+3300 |# limit checked (33aa) to 10% max either way with 32768 'base'
+3300 |#|# is R3a passed out of this func ? No next func in list writes to R3a
+3300 |#####################################
+3313 # is PIP_high_PW = 60 degrees in ticks ?
+331a # Difference in PIP (High?) intervals
+3320 # abs (difference)
+3322 # First time used - start at zero => delta
+3329 # abs(diff) > (PIP_Hi_Intvl * IDelta)/65536
+332b # always jumps for first change ?
+332f # abs (PIP_HI_intvl - Last_PIP_Intvl)*65536 / PIP_Hi_Intvl (Delta)
+3339 # R32 = Delta/65536 * PIP_HI_PW
+333c # (Delta * PIP_Hi_PW) - LastPipHiPW
+3342 # ABS Value (timediff?)
+3344 # R3a = I_Delta/10;
+3349 # move in R36
+3350 # change < 1% (PIP)
+3359 # R38 = 32768 - (I_Delta * 0.5)
+3360 # R38L = 32768-(I_Delta*0.5)*(Delta/65536)*PIP_HI_PW
+3399 # => 12.5% of change
+33aa # = 0.45
+33b4 # = 0.55
+33b8 # 0.5%, rounding ?
+33be # < 1%, ignore
+33e1 # 3276, add 5%
+33ed # max 32768, 50% ?
+33f1 ||############################################
+33f1 |# Base Injection calc from mass flow.
+33f1 |# Sets base flow after calc cylinder flow per bank from VAFs
+33f1 |# appears 4000 In to Calc_Cyl_Charge = 1.208g (1 litre) cyl charge
+33f1 |# at 1000rpm, so vaf_MFlow must be 8000 = 1500L/min or 750L/min?
+33f1 |############################################
+33f9 # would EGO feedback change this ??
+3400 # R3a = (mass) flow/2 ;
+345e # average both cyl flows
+3461 # R62 used in EGR and Ign calcs.
+3466 # and then recalc B1 only ? Odd.
+3469 ||############################################
+3469 |# Calc cyl mass charge from bank mass flow and RPM
+3469 |# Input  = R3e Bank Flow (half after scaler [around 3410] ?)
+3469 |# Answer = R3c Cyl Charge, limit checked (grams air ?)
+3469 |# R3c = (R3c*65536/(RPMx4))/6 
+3469 |# ANS = (Bank Charge*65536/RPMx4)/6.|#
+3469 |# VAF feeds 1 bank, 3 cyls, injects every rev.
+3469 |# so cyl charge = (Mass*16384)/(RPM*6) = Mass*8196/(rpm*3)
+3469 |# 4000 IN at 1000 rpm in gives 10927 out (= 1 litre cyl charge)
+3469 |# implying that 4000 in = 1500 L/min bank flow ?
+3469 |############################################
+346c # for double length div of R3e
+346e # R3e = Bank_Mass_Flow*32768/RPMx4
+3473 # safety clamp ?
+3475 # Not set - do this part
+3478 # R3c = Bnk_Mass*16384/(RPM*6)=> cyl charge
+347e # Different scale ?, ONE VAF ? - NOT USED
+34a0 ||###########################################################
+34a0 |# base injection time calc
+34a0 |# Input  = R3c, Cyl mass flow (half ?  scaled 65536 = 6 Litres ?)
+34a0 |# Output = R3c, Base inject time
+34a0 |# CALC   = (R3c * 2238)/ (INJECT_SIZE * 16384/65536) 
+34a0 |# 
+34a0 |# this is AFTER RPM calc included (i.e. = True Cyl charge)
+34a0 |# Later inj calc (at 38ba) is effectively 1:1 with no enrichments where 32768 = 125ms injection
+34a0 |# so calc becomes
+34a0 |# INJECT Time = (cyl_mass*4 /14.64)/INJECT_SIZE |#
+34a0 |# Notes:
+34a0 |# 92112 in gives 32768 (125mS) out, or 0.3479cc (0.252 grams ?)
+34a0 |# 5872 (max cyl_charge ?) gives 8mS (0.022 cc or 0.016gms ?)
+34a0 |# if 2 injections = 0.044 cc, implies 10.5:1 max fuel mixture
+34a0 |# 10924 = 1 litre air charge (1.208g) for TWO injection events (ans 3886)
+34a0 |# 10924*6 = 65544 (within 0.001% of 65536) implying that scale (in) is 65536 = 6 litres. 
+34a0 |# 5083 gives 6.9mS for 100% VE charge at 14.64:1 (ans = 1808)
+1 |# R22 is fixed, but is probably adjusted ratio if this vehicle had an EGO ?
+34a0 |###############################################################
+34aa # R22 = 0x4000 (16384)
+34ad # R34 = Injector size/4
+34bd ||#########################################################
+1 |# set various flags against RPM, checks for Cranking, underspeed,
+1 |# fuel clip (clsosing throttle) , knock risk etc
+1 |#########################################################
+34c6 # always JUMPS
+34c6 || ################## code ignored to 34f5 #################
+34f5 |################### end of ignored block #################|
+3507 # cranking cleared at 500 rpm, underspeed set.
+3513 # flags set if below 450 rpm
+351f # fail to start or stall ?
+352d # 450 < RPM < 600 ?
+353e # RPM > 505 (RPM > 600 from above - hysteresis?)
+354d # Set $2c:0
+3566 # RPM < 1800, throttle closed. Clip fuel instead of cutoff.
+356b # set $2c:2, clear others
+3570 # no cutoff if engine just started, or ECT out of range
+3585 ||## Not cranking ###
+3587 # Set $2c:1 (Fuel cutoff) if > 1500 RPM, ECT OK, etc.
+358a ||# end of TPS Closing ##
+358f # set $2c:3 if > 1800 RPM.  Others = 0
+3594 # Part Throttle = 1 [not used] others = 0 
+3599 # get $1a:6 and $1a:7
+35ac # now have pump, fail, etc flags in one word
+35b0 # DEBUG? IGN + TPS flag states at func exit
+35b5 ||######################
+35b5 |# Compensate base flow (from cyl) for ECT and other
+35b5 |# Note that Inj_slope is added to inj time so must also be calibrated
+35b5 |# as 0-32768 -> 0-125mS ...
+35b5 |######################|
+35bc # Vss-Val used only here
+35c2 # Inj_slope set only here
+35d1 # R6a scaled ECT 0 - 11
+35de # 64 is 'base' answer
+35ee # set 16384 if cranking
+35ff # Time lookup from ECT
+3631 # Ra2 then used in InjCalc    (38ba)
+363e ||#######################################################################
+363e |#    Cranking calculation ?
+363e |#######################################################################
+3680 ||#################################################
+3680 |# Accel pump (top level) Calculation
+1 |# includes cranking check
+1 |# base is 128 so no enrich whilst cranking
+3680 |##############################################|
+3689 # fix value if cranking 1:1 (128)
+36a5 # NEW accel pump values to save
+36c2 # NEW accel pump values to save
+36d1 ||#######################################################################
+36d1 |#######################################################################
+36ee ||##############################
+36ee | Fuel Clip calculation
+36ee |# weaken mixture for timer7 if flag set. (600 mS)
+36ee |# R30 = 64 (dflt) base = 64 (see later)
+36ee |# R30 -= 58, R30 = 6.
+36ee |# (timer7 * 6)/600 + 58 while timer7 < 600mS
+36ee |# i.e. 58 - 64 in 600mS (1 per 100mS)
+36ee |# This proc weakens mixture by 10% instantly, gradually raising back
+36ee |# to 100% after time expired (600mS). triggered when throttle closing
+36ee |# so prevents over rich mix (and surge ?)
+36ee |##############################
+3717 |||######################################
+3717 |#    Master Inject Time Calculation
+3717 |######################################
+3720 # 64 by default
+3730 # used only here (debug)
+374e # used only here    (debug)
+3768 # Inj_slope in true ticks
+376d # R30 = Bnk1Length - Inj_slope (true ticks)
+3776 # R30 *= 65536, R32 = R30;
+377e # Bnk2 = Bnk1 + Inj_slope + 13 (Why ? crankcase breather ?)
+3782 |||######################################
+3782 |# Calculate Enrich_factor (choke equiv?) from Cyl mass Flow and ECT
+1 |# called separately for each bank (- 35db, 35e8)
+3782 |# Inputs
+3782 |# R6a is scaled ECT (0-11)
+3782 |# R34 is Cyl_Flow
+3782 |# Rba is LU table (always 2531) 12 rows...
+3782 |# Tablookup answer in R3b (32 for hot engine) gives R3a 
+3782 |# Output in R3a - 16384 for hot engine
+3782 |######################################
+379c #  answer in R3b (32 for hot engine)
+37a1 # WORD answer = table LU*2*256 (16384 hot)
+37a4 ||######################################
+37a4 |# Base injection Lookup
+37a4 |# scales flow, rpm and looks up in LOAD table.
+37a4 |# Answer in R3b. called separately for each bank (36d4)
+37a4 |######################################
+37cf ||#################################
+37cf |# Cranking PW calculation
+37cf |# Input is R34 top of VAF Raw (VAF coarse )
+37cf |# ANSWERS
+37cf |# R3c plain answer to lookup table from VAF Coarse...
+37cf |# ONLY IF FLAG SET - (Cranking )
+37cf |# R38 is scaled as main Inj Calc where
+37cf |#    0-32768 maps to 0-125mS injection time
+37cf |#    R38 in 3.8147 uS units (262 ~ 1 mS).
+37cf |#
+37cf |#    R38 = Crank_LU * Crank_Fuel(ECT,Timer) * 83/32;
+37cf |# as Crank_LU appears base 96 ?, then this is Crank_Fuel * 249
+37cf |#################################
+37d7 # R3c used as answer (~3641)
+37dd # Crank PW calc from here
+37e7 # base is 128 ?
+3823 ||#################################
+3823 |# Accel Pump Enrichment - called PER BANK
+3823 |# Appears base scale (1:1) is 128 with min of 9 (7%), max of 64 (50% enrich)
+3823 |# Calc below would define accel pump runtime is 1 sec (1008 mS) if no TPS change,
+1 |# and Rba is a 'Calc Enrich Factor' which is about 5.2 times (512/1008) ? the actual 
+1 |# enrich to feed into the linear reduction calcuation, effectively (1 sec - runtime) * Enrich factor
+1 |# Params - (apart from TPS_angle, these are PER BANK)|#
+3823 |# IN     Rb8 = TPS_angle
+3823 |# IN/OUT R32 = (Bx_last_TPS) Last TPS angle|#
+3823 |# IN/OUT R3e = (BxAclEnr)   Enrichment factor, used in MAIN injection Calc
+3823 |# IN/OUT R3c = (VAFx_coarse) Coarse VAF value (base 256 ?)
+3823 |# IN/OUT R30 = (BxAccel_timer) Timer per bank (mS)
+3823 |# IN/OUT Rba = (BXAccel_Factor) Original calc, ~5 times enrich |#
+3823 |# OUT    B7 R3f no change to enrich values if set
+3823 |#################################
+382e # remaining bank timer >= 30mS ?
+3833 # If Enriching, jump to snip_calc to fade away the enrich
+3835 ||##### here if accel timers > 30mS
+3837 # New TPS position (Angle) for this bank
+3844 # R34 = 320 (0.025V)
+384a # Not enough change...
+384a |# accel pump calc
+3850 # R34 = 256 - FLow (VAF_Coarse)
+385a # always returns 131
+3864 # returns [19 (hot) - 127 (cold)]
+3867 # R38 = func(ECT)* 131 (2489 <= R38 <= 16637)
+386a # ANSWER R3e = R38/256 + 128 (137 <= R3e <= 192)
+3874 # R32 (word) = R39 (9 <= R39 <= 64)
+3877 # = 63
+387c # R3a = 16128
+387e # R30 = R32*4.06 = 36 <= R30 <= 260
+3883 # Enrich local factor (5x actual enrichment) is saved outside proc
+3886 # Clear timer => start enrichment (outside proc)
+3888 ||### gradually reduce enrich factor as time goes on #### 
+3892 # current enrich time/16
+389a # = 63 - (timer/16)
+389f # Timer < 1008 to get here ?
+38a4 # R3e = 63-(timer/16)*Max_timer/256 + 128. Reduce enrich by time left
+38ac # DEBUG ? used only here. Calc Oflow
+38b2 # Reset values, Accel pump OFF.
+38b9 ||################################################################
+38b9 |# Bank Injection time returned from here in R3a (in WDTimer ticks)
+38b9 |# called separately for each bank.    [- and something put in R30 for monitoring    ]
+38b9 |#
+38b9 |# Inputs
+38b9 |# R32  = Base cyl injection             Cyl mass flow/14.64
+38b9 |# Ra2  = ECT choke Scaler               16384 by default
+38b9 |# Rba  = Bank ECT compensation (choke)  16384    for 100% (hot engine)
+38b9 |# R2b  = Load compensation (VE trim ?)  128 for 100% 
+38b9 |# R3e  = InjnAclenr                     128 is 'base'
+38b9 |# Rb8  = InjnPar3                       16 (fixed in code, Always)
+38b9 |# R38  = Inj_Crank_PW                   If Cranking () otherwise ignored
+38b9 |# [159] = Time_enrich                   64 = 'base', range 58-64
+38b9 |#
+38b9 |# ANSWERS
+38b9 |#    R3a  =  Injection Time in CPU Timer ticks (of 4.8uS)
+38b9 |#    R30  =  set for debug? = Answer before base and Vss comp applied
+38b9 |#
+38b9 |#    cb74 (=52084) ticks = 0.25 secs, so R38 (in this routine) is scaled as (unsigned) 0-32768 => 0-125mS,
+38b9 |#    multiplied by 52084, giving 'timer ticks' in R3a (R3a = R38 * 52084/65536)
+38b9 |#    so 32768 = 0.3479cc of fuel (167cc/min /(60*8) for each cyl.
+38b9 |#    max charge for 2.792 Litre engine is 1.206 * 465cc = 0.561 grams making max injection requirement 0.3833g
+38b9 |#    at 14.64:1    This code does TWO injections per charge, so actual max is 0.1917g, 6.89mS or R38 = 1808 when
+38b9 |#    everything else is 1:1
+38b9 |#    calc operations in order ....|#
+38b9 |# R3a = enrich * Temp_Comp/65536 * Load /128*Accel_enrich /128
+38b9 |#       * Time_enrich /64 * Base_inj /4096 + Inj_slope * 52084/65536;
+38b9 |#
+38b9 |# (where enrich * Temp_Comp/65536 at hot engine = 4096...)
+38b9 |#    EQUATES TO
+38b9 |# Inj_Time = Choke * Load * Accel_F * Time_F * Base + Inj Slope ;
+38b9 |# (100% )    4096    128    128    64    256
+38b9 |# from 16384*16384/65536 and 16/4096|#
+38b9 |# If flag set (Cranking ) simply add Inj_slope to R38 and convert - |#
+38b9 |# ANSWER in    R3a    =    Inj_Crank_time + Inj_slope * 52084/65536;
+38b9 |###############################################################
+38c1 # Scale *ECT comp (4096 = 1:1 ?)
+38c7 # * Load comp. (128 = 1:1) 
+38cd # * accel enrich (128 = 1:1)
+38e6 # Rb8 = 16 (could otherwise be EGR ? )
+38ff # approx 30% richen if Underspeed -
+390a # Knock Enrich - Times 1 => redundant
+391a # R30 is enrich factor, base 4096 - for debug ?
+391d # Base_inj * enrich_factor/4096 
+3928 # Add injector slope
+3932 # => 125mS max
+3937 # Used only here - calc o/flow
+393a # effectively times 0.25 secs
+3944 # set limit if cranking and WOT
+3946 |||##########################################################
+3946 |# Trip PW Output ( =>freq) calculation.
+3946 |# PW limited 169 - 7fff no output if RPM = 0
+3946 |# faster freq = more fuel injected
+3946 |# 0x169 (361) implies 361*2*4.8uS = 288 Hz
+3946 |# 0x7fff (32767) implies 32767*2*4.8uS = 3.17 Hz
+3946 |# inject time is in timer ticks
+3946 |# 843 ticks inject time for 3 injectors is 0.0249 grams.
+1 |# so (Elapsed Time/0.025g shots of fuel ?)
+1 |# 26000/1 = 4 hz = 0.024 grams/sec => 0.06g per Hz/'tick' ?
+1 |# 26000/72 = 288Hz = 1.75g/sec = 6.3Kg/hr = 6.3/hr = 1.389 gals/hr.
+1 |# 100Hz would be 0.6g/sec , 200Hz 1.2g ?
+1 |# so is calibration actually 1Hz = 0.01g Fuel per cyl?
+3946 |##################################################
+3959 # Why not IOTIMER ?
+3968 # 32 bit add CTIME + TPS_Intvl
+3979 ||## enter here (approx) every second (26000*8*4.8 uS [double]) |
+3980 # (DBL) total injection time (- batt compensation)
+3985 # R30 = Trip_Inj/843 ()
+398f # keep remainder => mod(Trip_inj,843); double
+3997 # = (Elapsed Time/(total_inj_time/843) ;
+39b0 # clear Ctime.
+39b2 # END of one sec update
+39ba # save Ctime (zero or accum. total)
+39bf ||###############################################
+39bf |# Fuel Pump driver, timeout check (~ 1 sec)
+39bf |###############################################
+39cd ||#########################################################
+39cd |# sensor check and STI handler
+39cd |# - called from tasklist for sensor check.
+39cd |# looks like R2d is simply "time powered up" - not used anywhere else
+39cd |###############################################################
+39d2 # not until 2 secs since powered on ? 
+39ea # set $15:2 STI - Engine Off
+39f5 # set $15:3 STI - Engine Running
+
+39ff # SET $15:1 STI reset - KOEO only
+3a0b ||###### KOEO Test from here ########
+3a10 # clear STO after 1 sec or more
+3a1f # 1 volt
+3a26 # VAF 1 > 1V
+3a33 # 1 volt
+3a3a # VAF 1 AND 2 > 1V
+3a3f # Mark fail in 'master' failflags
+3a49 # Keep Flags - $b5:1, $B5:2, $b5:3
+3a59 # set STO for 1 sec - TPS or NDS changed ?
+3a5e # remember TPS and NDS flags
+3a61 ||# this is something TPS and VAF related as an end test ?    (KOEO only Engine off, no STI ) ####|
+3a63 # 0 (OK), 1 or 2 if VAf fail
+
+3a82 ||# next table is mapped in sequence against R20 (TPS flags ) and therefore represents...
+3a82 |# $20:1+$20:0, 0   , $20:2, 0   , $20:1+$20:0
+3a82 |# closed,                 Part, Wide,     Part, Closed  = Throttle position
+3a88 ||#################################################
+3a88 |# check sensors function from raw A/D readings
+3a88 |# and update flag bits accordingly - called regularly
+3a88 |# This function keeps $18 (R18) up to date
+3a88 |# and also stores flags in Rf8 - Rfd (if KOER)
+3a88 |#################################################
+3a89 # index counter to traverse vector list
+3a8c # sensor_number, used for bitmap
+3a93 # index*2 for word offset
+3a96 # get current fail flags
+3a99 # B0 R36 = Fail Flag for this sensor
+3a9c # Each (raw) sensor value
+3aa0 # Call checker for each sensor type
+3b1b # already flagged as failed ?
+3b20 # clear [f7+sensor no]
+3b27 # engine running (KOER), clear fail flag 
+3b39 # update 'master' copy
+3b44 # already flagged as failed ?
+3b49 # clear [f7+sensor no]
+
+3b50 # no, new fail state
+3b5f # set [f7+sensor no]
+3b65 # update 'master' and 'test' copies
+3b68 # ignore BAP error
+3b77 ||###### KOER Test from Here #####
+3b86 # Timer = 16 secs (effectively)
+3b95 #  < 5 seconds
+3b9a # reset timer to 16 secs (256) ? 
+3b9c # start output here after 5 secs
+3ba4 # R30 = Timer*16
+3baa # Timer < 16, (2 secs) skip ?
+3bb2 # Timer < 1 sec
+3bbf # R14 is sensor number
+
+3bc8 # code 11 - all OK
+3bdd # all 16 bits scanned...
+3be6 # times 2 for word offset
+3bee # actual output from here
+3bfe # bits in groups of 3
+3c09 |||################ error code table ##################################
+3c09 |# Indexed by bit position [within word] from test subroutine - in order
+3c09 |# [All OK], VAF1 Fail, TPS Fail, ECT Fail, ACT Fail, VAF2 Fail, BAP Fail,
+3c09 |# VAF out of range, RAM Fail, ROM Fail.
+3c09 |####################################################################
+1 |# Haynes book indicates    11 - OK, 12 VAF1, 13 CTS, 14 ACT, 15 TPS, 22 VAF2
+1 |# 23 VAF1 and VAF2, 31 Wiring/circuit fault    32 Wiring/circuit fault.
+3c09 |####################################################################
+3c0a # 11 (OK) , 22 (VAF1)
+3c0e # 15 (TPS), 13 (ECT)
+3c12 # 14 (ACT), 12 (VAF2)
+3c16 # 25 (BAP), 23 (VAF_OR)
+3c1a # 31 (RAM), 32 (ROM)
+3c1d ||#######################################
+3c1d |#    ISC Pulsewdith Calculation
+3c1d |# R38 is answer at final exit to ISC_PW
+3c1d |# ISC_PW is 0-32768 => 6.25mS
+3c1d |#######################################
+3c1e # set std 10 degrees BTDC (12 if cleared)
+3c24 # No ISC required if no Fuel Pump
+3c2f # 100% of change but negated
+3c3c # fixed pulsewidth if = 1 (is zero)
+3c46 # Fixed ISC pulswidth in TICKS
+3c4d # start PW calc
+3c64 # always jumps...2452 is zero
+3c69 # add 200 rpm for 4 sec intervals ? part of self test ?
+3c72 # from last calc
+3c81 # Value  Used directly if TPS fail
+3c87 # Cranking - fixed ISC (100%) and exit
+3c94 # Underspeed - fixed (80%) ISC and exit
+3cae # Fuel cutoff and/or NEW TPS are set
+3cb3 # Straight lookup and exit
+3cbc # Fuel cutoff NOT set
+3cd3 # TPS position changed - only called from 3cc4
+3ceb # set 12 degree base ignition.
+3d3f # add 75 rpm - Idle Speed Adjust
+3d92 # R38 = ECT_LU2(ECT_val)*ISC_PW_RPM(delta_rpm) (scale redundant)
+3d98 # 32 bit addition and overflow check follows
+3db1 # 32 bit subtract
+3db8 # add/subtract R38 from/to ISC_val_last (32 bit)
+1 ||#### final ISC value in 32 bits, limit check, add NDS, ACC and lookup (slope ?) for final value ####
+3dc1 # 10% minimum
+3dd0 # R34 = ISC_Val / 65536
+3dd6 # +0%
+3dde # +6.5% (65536 base)
+3de7 # R34 is 0-65535 for 0-100% at this point
+3def |||#######################################
+3def |#    Main Timer Update function
+3def |#######################################
+3df5 # Continue/Start 'Engine Runnning' Timer
+3dfa # Cranking -> Stop 'Engine Runnning' Timer
+3dfd # and Zero it
+3dff # do all the other timers.
+3e02 |||#######################################
+3e02 |#    Timer list and update subroutine
+3e02 |#######################################|#
+3e02 |# Rde @de  Bank 1 Accel pump Timer (mSecs).
+3e02 |# Re0 @e0  Bank 2 Accel pump Timer (mSecs).
+3e02 |# Rea @ea  Engine run Timer in secs (from Cranking END, wrap at 9 hours)
+3e02 |# R67 @67  Used for 1 second 'ticks' for STO self test codes ?
+3e02 |# R2d @2d  ? 
+3e02 |# Rf8-Rfd       Dummy ?
+3e02 |# Re6 @e6  related to ISC (20 msec)
+3e02 |# R4e @4e  Injection weaken for 600 mS    
+3e02 |# Rf4 @f4  ?
+3e02 |# Rfe @fe  NDS ?Not used ?
+3e02 |# Rc0 @c0  Cranking Timer (secs from first PIP) set at 12 for restart.
+3e02 |#######################################
+3e02 |# List Structure -> Flags, Timer location (pointer)    [Flags2, Reg ptr2 - if B0 set]
+3e02 |# Looks like counter values are always unsigned 2 or 4 byte entries.
+3e02 |# Flag (SET,    CLEAR,   description)
+3e02 |# B0    four,   two      byte table entry
+3e02 |# B1    word,   byte     count register size UNSIGNED
+3e02 |# B2    down,   up       count direction. Will wrap around correctly
+3e02 |# B3    run,    stop     counting if mask of flags2 & Reg2 zero    ** 4 entry only **
+3e02 |#                        (i.e. specifies stop and/or run flags for this timer)
+3e02 |#
+3e02 |# B5    count in  mSecs
+3e02 |# B6    count in  1/8ths sec
+3e02 |# B7    count in  1 sec     These bits used in a mask op at 3e91 ish.
+3e02 |#######################################
+3e05 # Word, mSecs, Up (and next one)
+3e09 # Word, secs , Up  Count if $ae:1 = 1
+3e0d # Byte, 1/8s , Up
+3e0f # Byte, secs , Up
+3e11 # Byte, secs , Up   f8 - fd
+3e15 #  Are these dummy or for self test ?
+3e1d # Word, mSecs, Up (next 4)
+3e25 # Word, mSecs, Up  Count if $ae:5 = 0
+3e29 #### end of list ####
+3e29 ||############################################################
+3e29 |# Update Timers.
+3e29 |# NB. at 3e3c  R38 =(R38*256)/d055 is elapsed integer mSecs for 4.8uS timer [208.33 ticks per mS]
+3e29 |###########################################################
+3e3c # mS elapsed since last run 
+3e44 # return if 0 mSec elapsed
+3e48 # rounding (effectively +0.5)
+3e58 # New mSec(s)
+3e64 # cycle mS count around 0-125 mSecs i.e. 1/8ths sec
+3e67 # New 8th sec
+3e6d # New sec
+3e73 # get next entry (R3c = flags)
+3e79 # end of list, return
+3e7b # register (value) pointer
+3e7e # 2 word entry, skip mask check
+3e81 # 4 word entry, get flags mask
+3e84 # get actual flags/register
+3e87 # and mask them 
+3e8a # Result <> 0 to count
+3e8d # Result == 0 to count
+3e91 # !B3&&(3e87) mask = 0, skip count
+3e93 # mask for time bits.
+3e97 # No time bits overlap - skip count
+3e9c # Count size is word
+3ea1 # Count size is byte
+3ea7 # Negate if counting DOWN
+3ea9 # Skip ovf checks if cntg down and zero
+3eae # inc (dec) timer value if not mS based
+3eb2 # or add true mS elapsed.
+3eb7 # overflow - reset value to zero (up).
+3ebc # overflow - reset value to max  (down)
+3ec1 # Negate (restore) if counting down
+3ec6 # save timer - word
+3ecb # save timer - byte
+3ed0 ||###########################################################################
+3ee4 # Delay, 90 loops and then skip CALCON call
+3ee8 # Calibration Console code entry point
+3eee ||###################################################
+3eee |# Answer EGR_PW appears scaled as 0-32768 = 20mS  #
+3eee |###################################################
+3efe # Fixed EGR pulswidth
+3f00 # not in test mode
+3f10 # less than 35 secs
+3f1d # Greater than 67 secs
+3f1f # 20% on
+3f24 # 2 sec intervals ?
+3f27 # 5% on
+3f45 # both tabs fixed at 64 (=4096)
+3f61 # 12.5% on
+3f75 # scaled flow
+3f78 # multiplier from above
+3f7f # all 32 in table
+3f88 # =4096*32 = 131072
+3f8c # R32 = 32 
+## 3f09 ## guessed at this, looks dodgy to me, R32 not valid state...
+##3f0d ## matches 2 litre code from here
+
+
+
+
+
