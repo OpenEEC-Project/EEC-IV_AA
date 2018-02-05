@@ -1,0 +1,507 @@
+
+
+# doesn't need any dirs, only symbols here
+
+SYM  d000 "CalCon"
+SYM  83e05 "Timer_List"
+
+SYM  12 "T_OVF_CNT"
+sym  12 "duplicate_test"
+SYM  2 "FPUMP_DRV" : T +7
+SYM  15 "EndTest" : T +1
+SYM  18 "VAF2Fail" : T +1
+SYM  15 "KOEO" : T +2
+SYM  15 "KOER" : T +3
+SYM  15 "test_flags"
+SYM  16 "VAF2code" : T +1
+SYM  16 "TPScode" : T +2
+SYM  16 "ECTcode" : T +3
+SYM  16 "ACTcode" : T +4
+SYM  16 "VAF1code" : T +5
+SYM  16 "BAPcode" : T +6
+SYM  16 "VAF_TPSCode" : T +7
+SYM  16 "RAM_code" : T +8
+SYM  16 "ROM_code" : T +9
+SYM  16 "codeflags"
+
+SYM  18 "TPSFail" : T +2
+SYM  18 "ECTFail" : T +3
+SYM  18 "ACTFail" : T +4
+SYM  18 "VAF1Fail" : T +5
+SYM  18 "BAPFail" : T +6
+SYM  18 "Fail_flags"
+
+SYM  1a "SPK_off_pend" : T +0
+SYM  1a "SPK_on_pend" : T +1
+SYM  1a "SPK_state" : T +2
+SYM  1a "Ign_Adv" : T +3
+SYM  1a "Lock_Ign" : T +4
+SYM  1a "Prev_underspd" : T +5
+SYM  1a "Underspeed" : T +6
+SYM  1a "Cranking" : T +7
+SYM  1a "IgnFlags"
+SYM  1b "Base_ign_rqd" : T +7
+SYM  1b "flagsw5"
+SYM  1c "Ign_Advance"
+SYM  1d "Last_Ign_adv"
+SYM  1e "PIP_High_PW"
+SYM  20 "TPS_Closed" : T +0
+SYM  20 "TPS_TClosed" : T +1
+SYM  20 "TPS_Wide" : T +2
+SYM  20 "TPS_Vaf1" : T +6
+SYM  20 "TPS_Vaf2" : T +7
+SYM  20 "TPS_flags"
+SYM  21 "mS_Count"
+sym  22 "Inj_Scaler"
+SYM  24 "Coldstart_secs"
+SYM  26 "ACT_start_W"
+SYM  27 "ACT_start"
+SYM  28 "Load_BK1"
+SYM  29 "Load_BK2"
+SYM  2a "8ths_sec"
+SYM  2c "Cold_start" : T +0
+SYM  2c "No_Fuel" : T +1
+SYM  2c "Fuel_Clip" : T +2
+SYM  2c "Knock_Risk" : T +3
+SYM  2c "RPM_flags"
+SYM  2d "Pwrd_tmr"
+SYM  2e "Last_ISC_Time"
+SYM  40 "Last_PIP_High"
+SYM  42 "Last_Ign_delay"
+SYM  44 "PIP_Intrvl"
+SYM  46 "LastPipHiPW"
+SYM  48 "Cyl_no"
+SYM  49 "On_pend_BK2" : T +0
+SYM  49 "Off_pend_BK2" : T +2
+
+SYM  4b "This_HSI"
+SYM  4e "FuelClip_timer"
+SYM  50 "Inj_slope"
+SYM  52 "VBATT"
+SYM  54 "Last_SP_state" :  T 0
+
+SYM  54 "Last_HSI"
+SYM  55 "FPUMP_Ticks"
+SYM  56 "Last_KA_Time"
+SYM  58 "Ign_Delay"
+SYM  5a "PUMP_Reqd" : T +2
+SYM  5a "STO_Reqd" : T +3
+SYM  5a "STI_Reqd" : T +4
+SYM  5a "TRIP_Reqd" : T +5
+SYM  5a "ISC_Calc_reqd" : T +6
+SYM  5a "ISC_Tmr_reqd" : T +7
+sym  5a "Svc_flags" 
+SYM  5b "MainTaskNum"
+SYM  5c "RPM_Smooth"
+SYM  5e "Last_SPK_On"
+SYM  60 "Last_SPK_Off"
+SYM  62 "Cyl_Mass_BK1"
+SYM  64 "Cyl_Mass_BK2"
+SYM  67 "STI_timer"
+SYM  69 "VAF_OVF" : T +0
+SYM  69 "ACCL_OVF" : T +2
+SYM  69 "Flow_OVF" : T +3
+SYM  69 "InjC_OVF" : T +5
+SYM  69 "OVF_flags"
+SYM  6e "ECT_comp_BK1"
+SYM  70 "RPM"
+SYM  72 "ECT_val"
+SYM  73 "ACT_val"
+SYM  74 "DBG_BK1_flow"
+SYM  76 "TRIP_PW_Time"
+SYM  78 "TRIP_Time"
+SYM  7a "TaskListCnt"
+SYM  7b "AE_readcnt"
+SYM  7c "Octane_adj"
+SYM  7e "VAF2_raw"
+SYM  7f "VAF2_raw/256"
+SYM  80 "Vss_raw"
+SYM  82 "ACC_raw"
+SYM  8a "OCT_raw"
+SYM  8c "TPS_raw"
+SYM  8e "ECT_raw"
+SYM  90 "ACT_raw"
+SYM  92 "NDS_raw"
+SYM  96 "VAF1_raw"
+SYM  97 "VAF1_raw/256"
+SYM  98 "SubTaskNum"
+SYM  9a "VAF1_Mflow"
+SYM  9c "VAF2_Mflow"
+SYM  9e "ECT_Start_hb"
+SYM  9f "ECT_start"
+SYM  a0 "ECT_comp_BK2"
+SYM  a2 "Enrich_factor"
+SYM  a4 "ECT_PAR_X"
+SYM  a6 "VAF1_coarse_Val"
+SYM  a8 "New_PIP" : T +0
+SYM  a8 "New_BAP" : T +2
+SYM  a8 "New_STI" : T +3
+SYM  a8 "New_IDL" : T +5
+SYM  a8 "New_HSI"
+SYM  a9 "PIP_Lead_Calc" : T +1
+SYM  a9 "PIP_Trail_Calc" : T +2
+SYM  a9 "PIP_Trail" : T +3
+SYM  a9 "PIP_State" : T +5
+SYM  a9 "IgnFlags2"
+SYM  aa "TPS_Posn"
+SYM  ac "Ign_DELTA"
+SYM  ae "Running" : T +1
+SYM  ae "First_PIP" : T +5
+SYM  ae "First_PIP_hi" : T +6
+SYM  ae "flags1"
+SYM  b2 "HSO_BUSY" : T +0
+SYM  b2 "HSO_ontime" : T +5
+SYM  b2 "Option_2"  : T +6
+SYM  b2 "Option_1" : T +7
+SYM  b2 "Option_3" : T +4
+SYM  b2 "HSO_Flags"
+SYM  b3 "Base_Calc_OK" : T +0
+SYM  b3 "Trip_state" : T +2
+SYM  b3 "EGR_State" : T +3
+SYM  b3 "ISC_off" : T +4
+SYM  b3 "ISC_state" : T +5
+SYM  b3 "STO_state" : T +6
+SYM  b3 "State_flags"
+SYM  b4 "Inj_rqd_BK1" : T +0
+SYM  b4 "Inj_rqd_BK2" : T +1
+SYM  b4 "SPARK_rqd" : T +2
+SYM  b4 "DOL_rqd" : T +6
+SYM  b4 "ISC_rqd" : T +7
+SYM  b4 "OP_Reqd_flags"
+SYM  b5 "TimerOVF" : T +0
+SYM  b5 "NDS_Drive" : T +1
+SYM  b5 "NDS_Neutral" : T +2
+SYM  b5 "ACC_On" : T +3
+SYM  b5 "NDS_Change" : T +4
+SYM  b5 "No_Lock_Ign_ISC" : T +5
+SYM  b5 "New_PIP" : T +6
+SYM  b5 "New_RPM" : T +7
+SYM  b5 "flags3"
+SYM  b6 "Off_pend_BK1" : T +2
+SYM  b6 "Spark_Missed" : T +4
+SYM  b6 "On_pend_BK1" : T +6
+SYM  b7 "Task_Fail" : T +1
+SYM  b7 "Idle_Adjust" : T +5
+SYM  bc "VAF2_coarse_Val"
+SYM  be "Averaged_RPM"
+SYM  c0 "Cranktime"
+SYM  c2 "TimeOn_BK1"
+SYM  c4 "TimeOff_BK1"
+SYM  c6 "Length_BK1"
+SYM  c8 "TPS_Min"
+SYM  ca "ACL_Enrich_BK1"
+SYM  cc "ACL_enrich_BK2"
+SYM  ce "Inj_Cyl_BK1"
+SYM  d0 "Inj_Cyl_BK2"
+SYM  d4 "TimeOn_BK2"
+SYM  d6 "TimeOff_BK2"
+SYM  d8 "Length_BK2"
+SYM  da "Par_16_BK1"
+SYM  db "Par_16_BK2"
+SYM  dc "APenr_BK1"
+SYM  dd "APenr_BK2"
+SYM  de "Accl_Timer_BK1"
+SYM  e0 "Accl_Timer_BK2"
+SYM  e2 "Last_TPS_Pos_BK1"
+SYM  e4 "Last_TPS_Pos_BK2"
+SYM  e6 "Timer6"
+SYM  e8 "Ign_Cyl_Mass"
+SYM  ea "Run_Time"
+SYM  ec "TPS_val"
+SYM  ee "Last_PIP_Low"
+SYM  f0 "Ign_Delta"
+SYM  f2 "Base_ign_delay"
+SYM  f4 "ISCTimer"
+SYM  f6 "Neg_flag" : T +0
+SYM  f6 "Unsigned" : T +1
+SYM  fe "NDS_Timer"
+SYM  128 "Last_PIP_Intvl"
+SYM  12a "DBG_BK2_Flow"
+SYM  130 "ISC_PW_Final"
+SYM  132 "Reqd_idle_RPM"
+SYM  134 "Delta_ISC_RPM"
+SYM  136 "ISC_val3"
+SYM  138 "DBG_ISC_V5"
+SYM  13a "Last_ISC_L"
+SYM  13c "Last_ISC_H"
+SYM  140 "EGR_PW"
+SYM  142 "EGR_Last_time"
+SYM  144 "Timers_last_run"
+SYM  146 "Last_TPS"
+SYM  148 "TPS_Interval"
+SYM  14a "DBG_BK1_Par"
+SYM  14c "DBG_BK2_Par"
+SYM  152 "Last_BAP"
+SYM  154 "BAP_Interval"
+SYM  156 "BAP_Freq"
+SYM  158 "BAP_Val"
+SYM  159 "Inject_Clip"
+SYM  15a "DBG_Rpm_Flags"
+SYM  15c "Tot_Inj_L"
+SYM  15e "Tot_Inj_H"
+SYM  160 "Inj_Crank_Time"
+SYM  162 "TRIP_CTimeH"
+SYM  164 "TRIP_CTimeL"
+SYM  166 "OCT_flt"
+SYM  2400 "VAF1_Scaler"
+SYM  2402 "VAF1_Trim"
+SYM  2404 "VAF1_Trimx"
+SYM  2406 "VAF2_Scaler"
+SYM  2408 "VAF2_Trim"
+SYM  240a "VAF2_Trimx"
+SYM  240c "BAP_Dflt"
+SYM  2410 "CnkSetRPM"
+SYM  2412 "UspClrRPM"
+SYM  2414 "UspSetRPM"
+SYM  2416 "RPM_1500"
+SYM  2418 "RPM_1800"
+SYM  241a "C250deg"
+SYM  241b "C-40deg"
+SYM  241c "Tmr_Lim_0"
+SYM  241e "InjSize"
+SYM  2420 "CylChMax"
+SYM  2422 "CylChKMin"
+SYM  2424 "TP_Accel_min"
+SYM  2426 "EmgyEnrich"
+SYM  2427 "KnckEnrich"
+SYM  2428 "C80deg"
+SYM  2429 "RPM_CLC_0"
+SYM  242a "Sensor_1"
+SYM  242b "sensorx_1"
+SYM  242c "DenseScaler"
+SYM  242e "IGN_TRIM_0"
+SYM  2430 "IGNKnckLow"
+SYM  2432 "IGNRegMin"
+SYM  2433 "IGNRegMax"
+SYM  2434 "IgnScaler"
+SYM  2435 "C36_deg"
+SYM  2436 "C-40_deg"
+SYM  2437 "C100_deg"
+SYM  2438 "C20_deg"
+SYM  243a "VAF_dflt"
+SYM  243b "VAF_Coarse_dflt"
+SYM  243c "650_Secs"
+SYM  243e "AccelPump_Time"
+SYM  243f "AccelP_min_Time"
+SYM  2440 "DOL_scaler"
+SYM  2442 "Ign_flt_sc"
+SYM  2444 "1000RPM"
+SYM  2446 "50RPM"
+SYM  2448 "0.065V"
+SYM  244a "3.25V"
+SYM  244c "FLGS_B3_B0"
+SYM  244e "RPM_VFilter"
+SYM  2450 "UspISC_PW"
+SYM  2451 "CrnKISC_PW"
+SYM  2452 "ISC_FixPW"
+SYM  2453 "ISC_FPW"
+SYM  2454 "20mSec"
+SYM  2456 "RPM_1430"
+SYM  2458 "EGR_Present"
+SYM  245a "EGR_PW1"
+SYM  245c "EGR_LIM1"
+SYM  245e "EGR_lim2"
+SYM  2460 "600mSec"
+SYM  2462 "Snip_58"
+SYM  2464 "Max_RPM"
+SYM  2466 "ISC_Freq"
+SYM  2468 "IGN_KnckDly"
+SYM  246a "Crank_1"
+SYM  246c "Stall_Ctime"
+SYM  2470 "BAP_MAX"
+SYM  2472 "BAP_MIN"
+SYM  2474 "0deg"
+SYM  2475 "3deg"
+SYM  2476 "6deg"
+SYM  2477 "defdeg"
+SYM  2478 "EGR_chan"
+SYM  247a "3_secs"
+SYM  247c "ISC_Min"
+SYM  247e "ISC_ACC_0"
+SYM  2480 "ISC_NDS_4260"
+SYM  2482 "ISC_2_secs"
+SYM  2484 "5V"
+SYM  2486 "0.125V"
+SYM  2488 "4.6V"
+SYM  248a "0.15V"
+SYM  248c "4.6V"
+SYM  248e "0.26V"
+SYM  2490 "5V"
+SYM  2492 "0.2V"
+SYM  2494 "IGN_12"
+SYM  2496 "EGR_PW2"
+SYM  2498 "EGR_PW3"
+SYM  249a "32_secs"
+SYM  249c "1_sec_T9"
+SYM  249e "1_sec_T9x"
+SYM  24a0 "InjScaler"
+SYM  24a2 "InjTrimB2"
+SYM  24a4 "InjMax"
+SYM  24a6 "IdleAdjRPM"
+SYM  24a8 "DOL_Freq"
+SYM  24aa "NDS_Scaler"
+SYM  24ac "IGN_NDS_0"
+SYM  24ae "CrankHystRPM"
+SYM  24b0 "3.845V"
+SYM  24b2 "1.92V"
+SYM  24b4 "0.0V"
+SYM  24b6 "RPM_1200"
+
+SYM  24b8 "Load"       
+SYM  2531 "Cold_Enrich"  
+SYM  2579 "Ign_Adv_Cold"  
+SYM  25f2 "Ign_Adv_Hot"   
+SYM  266b "Ign_Adv_ECTFlow"   
+SYM  269b "Ign_Adv_ColdStart"  
+SYM  2714 "EGR_PW_Tab"        
+SYM  2754  "Cranking_Fuel" 
+SYM  279c  "Inj_slope" 
+SYM  27b4  "ECT_Mult_temp" 
+SYM  27cc  "ECT_Time_temp"  
+SYM  27d8  "ECT_Accel_LU"   
+SYM  27e4  "VAF_Coarse_TFR" 
+SYM  2802  "Accel_LU"  
+SYM  2818  "ECT_Coldstart_Time"  
+SYM  2838 "ECT_SCALE_11"
+
+SYM  2858 "RPM_SCALE_10"
+SYM  2874 "FLOW_SCALE_10"
+SYM  2884 "ECT_SCALE_7"
+SYM  28a0 "FLOW_SCALE_5"
+SYM  28b0 "Ign_Interp"
+SYM  28c0 "Vss_TFR"
+SYM  28cc "VAF_TFR" 
+
+SYM  2918  "ECT_TFR"
+SYM  296c  "ACT_TFR" 
+SYM  29c0  "Air_Density"
+SYM  29e8  "IDLE_ECT" 
+
+SYM  29fc "ISCxRPM"
+SYM  2a24 "ECT_LU2"
+SYM  2a3c "ISC_Slope"
+SYM  2a64 "ISC_RPM_2"
+SYM  2a7c "ISC_Start_PW"
+SYM  2a94 "EGR_ECT"
+SYM  2a9e "EGR_ACT"
+SYM  2aa8 "RPM_SCALE_7"
+SYM  2abc "FLOW_SCALE_7"
+SYM  2ad0 "SCALE_CrankTime"
+SYM  2adc "BAP_TFR"
+SYM  2af0 "RPM_Crank_LU"
+SYM  2b04 "NDS_IDLE_CHANGE"
+SYM  3c0a "Err_codes"
+ 
+
+# SYM  2020 "INITIALISE"
+SYM  2050 "ROMStart"
+SYM  205e "ROMEnd"
+SYM  20f4 "main_loop"
+SYM  2118 "Check_KA"
+SYM  2132 "Read_AD"
+SYM  2156 "Keep_Alive"
+SYM  2169 "Run_SubTasks"
+SYM  2171 "Pump_Sto"
+SYM  22ab "ClearReqd"
+SYM  22cb "B1_on"
+SYM  22e0 "B1_off"
+SYM  2358 "Clearfexit"
+SYM  23e7 "Busy_exit"
+SYM  2b24 "Out_Now"
+SYM  2b37 "Out_Dly"
+SYM  2b45 "Exit"
+SYM  2bb8 "Main_EXIT"
+SYM  2da3 "Clear_ign_lock"
+SYM  2da6 "HSI_Next"
+SYM  2dab "Clear_Spark_Reqd"
+SYM  3ec3 "Save_Timer"
+SYM  33e1 "Set_delta"
+SYM  33f1 "endfunc"
+SYM  3dea "endfunc"
+SYM  38b9 "endfunc"
+SYM  3c06 "endfunc"
+SYM  39bf "endfunc"
+SYM  363e "endfunc"
+SYM  36d1 "endfunc"
+SYM  3837 "Accel_recalc"
+SYM  388a "Reduce_Accel_pump"
+SYM  38ac "ACl_OVF"
+SYM  2cc6 "Do_Next_HSI"
+SYM  2ce5 "BAP_Int"
+SYM  2cd7 "Check_Next_HSI"
+SYM  2ce0 "Ignore_STI"
+SYM  2cff "Ignore_IDL"
+SYM  2cfa "Ignore_SB4"
+SYM  2d04 "PIP_INTH"
+SYM  3f9a "SubTaskList"
+SYM  2f3d "Scale_R3c"
+
+SYM  3947 "Trip_Calc"
+SYM  39c2 "Fuel_Pump"
+
+SYM  32a9 "TabInterp"
+SYM  2b1c "HSOUT"
+SYM  2395 "Do_OUTPUT"
+SYM  2197 "Do_outputs"
+SYM  2ba7 "Do_subTaskList"
+SYM  21b5 "Do_SPARK"
+SYM  22af "Do_InjBank1"
+SYM  2307 "Do_InjBank2"
+SYM  2bbb "Do_ISC_OUT"
+SYM  2c28 "Do_EGR_OUT"
+SYM  235f "Do_Trip_Dbl"
+SYM  2b67 "Do_Trip_Single"
+SYM  2b8a "STO_OUT"
+SYM  2e8c "IGN_Temp_Calc"
+SYM  3ac2 "VAF_Check"
+SYM  3ad2 "TPS_Check"
+SYM  3ae2 "ECT_Check"
+SYM  3af2 "ACT_Check"
+SYM  3b02 "BAP_Check"
+SYM  3b6c "Next_Sensor"
+SYM  3b6e "Skip_Sensor"
+SYM  2b47 "Inc_Injtime"
+SYM  2f45 "Ign_Delay_Calc"
+SYM  3ed3 "CAL_CON"
+SYM  3017 "Process_Sensors"
+SYM  3125 "Main_airflow_calc"
+SYM  31c9 "Process_TPS"
+SYM  34be "Set_RPM_flags"
+SYM  322e "RPM_calc"
+SYM  33f4 "Base_inj_calc"
+SYM  346c "Calc_Cyl_AirMass"
+SYM  34a1 "Base_Cyl_Inj_calc"
+SYM  35b8 "Enrich_Flow_calc"
+SYM  3683 "Calc_Accelpump"
+SYM  2dda "Spark_calc_1"
+SYM  3301 "Ign_Delta_Calc"
+SYM  2deb "IGN_clc3"
+SYM  2df6 "Base_Ign_Lookup"
+SYM  3597 "main_seq"
+SYM  38af "Acl_pump_off"
+SYM  38b6 "No_Pchange"
+SYM  38ba "Main_Inj_Calc"
+SYM  371a "Inject_Time_calc"
+SYM  37a5 "Load_lookup"
+SYM  36f1 "Clip_Inj_Calc"
+SYM  3641 "Cranking_Inj_Calc"
+SYM  3785 "enrich_viaECT_calc"
+SYM  37d0 "Crank_Inj_calc"
+SYM  36d4 "Load_Calc"
+SYM  31af "Mass_Flow"
+SYM  2fe1 "SWfilter"
+SYM  2fe6 "UWfilter"
+SYM  3932 "I_Overf"
+SYM  3a89 "Check_Sensors"
+SYM  39d0 "Sensor_Test"
+SYM  3df2 "Timer_Update"
+SYM  3dba "ISC_Set_Final"
+SYM  3ef1 "Calc_EGR_PW"
+SYM  3e2a "Upd_Timers"
+SYM  3c1e "ISC_pw_calc"
+SYM  3824 "Accel_pump"
+SYM  3cdf "ISC_TimCheck"
+SYM  3b3e "Sensor_fail"
+SYM  3b15 "Sensor_pass"
+SYM  3f6e "EGR_AECT_calc"
+SYM  3e73 "Next_item"
